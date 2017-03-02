@@ -5,6 +5,8 @@ import com.rabbitmq.client.Connection;
 
 import java.util.concurrent.TimeoutException;
 
+import org.apache.flink.streaming.api.datastream.DataStream;
+
 import com.rabbitmq.client.Channel;
 
 
@@ -14,7 +16,7 @@ public class Send {
 	public static void main(String[] argv)
 			throws java.io.IOException, TimeoutException {
 		
-
+		
 		// create a connection to the server
 		ConnectionFactory factory = new ConnectionFactory();
 		factory.setHost("localhost");
@@ -23,7 +25,7 @@ public class Send {
 		
 		//declare a queue for us to send to; then we can publish a message to the queue
 		channel.queueDeclare(QUEUE_NAME, false, false, false, null);
-	    String message = "Hello !";
+	    String message = "Hello world !";
 	    channel.basicPublish("", QUEUE_NAME, null, message.getBytes());
 	    System.out.println(" [x] Sent '" + message + "'");
 	    
