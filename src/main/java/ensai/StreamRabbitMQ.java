@@ -20,12 +20,15 @@ package ensai;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.connectors.rabbitmq.RMQSource;
 import org.apache.flink.streaming.connectors.rabbitmq.common.RMQConnectionConfig;
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema;
 import org.apache.flink.util.Collector;
+
+import ensai.SocketTextStreamWordCount.LineSplitter;
 
 /**
  * This example shows an implementation of WordCount with data from a text
@@ -80,7 +83,9 @@ public class StreamRabbitMQ {
 		        new SimpleStringSchema()))   // deserialization schema to turn messages into Java objects
 		    .setParallelism(1);  
 
-		stream.print();
+		DataStream<Tuple3<String, String, String>> res  = 	stream.flatMap(new LineSplitter());
+
+		res.print();
 
 		// execute program
 		env.execute("Java WordCount from SocketTextStream Example");
@@ -95,19 +100,32 @@ public class StreamRabbitMQ {
 	 * FlatMapFunction. The function takes a line (String) and splits it into
 	 * multiple pairs in the form of "(word,1)" (Tuple2<String, Integer>).
 	 */
-	public static final class LineSplitter implements FlatMapFunction<String, Tuple2<String, Integer>> {
+	public static final class LineSplitter implements FlatMapFunction<String, Tuple3<String, String, String>> {
 
 		@Override
-		public void flatMap(String value, Collector<Tuple2<String, Integer>> out) {
+		public void flatMap(String value, Collector<Tuple3<String, String, String>> out) {
+			
 			// normalize and split the line
-			String[] tokens = value.toLowerCase().split("\\W+");
-
-			// emit the pairs
-			for (String token : tokens) {
-				if (token.length() > 0) {
-					out.collect(new Tuple2<String, Integer>(token, 1));
-				}
+			String[] tokens = value.toLowerCase().split(" ");
+			tokens[0] = tokens[0].split("#")[1];
+			tokens[1] = tokens[1].split("#")[1];
+			String[] tab  = tokens[2].split("\\^\\^");
+			if (tab.length == 1){
+				tokens[2] = tab[0].split("#")[1];
 			}
+			else{
+				tokens[2] = tab[0];
+			}
+			
+			out.collect(new Tuple3<String, String,String>(tokens[0], tokens[1], tokens[2]));
+			
+			// emit the pairs
+//			for (String token : tokens) {
+//				if (token.length() > 0) {
+//					out.collect(new Tuple3<String, String,String>(token, 1));
+//				}
+//			}
+			
 		}
 	}	
 }

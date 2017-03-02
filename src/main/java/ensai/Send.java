@@ -12,13 +12,10 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import com.rabbitmq.client.Channel;
 
-
 public class Send {
 	private final static String QUEUE_NAME = "coucou";
 
-	public static void main(String[] argv)
-			throws java.io.IOException, TimeoutException {
-
+	public static void main(String[] argv) throws java.io.IOException, TimeoutException {
 
 		// create a connection to the server
 		ConnectionFactory factory = new ConnectionFactory();
@@ -26,11 +23,11 @@ public class Send {
 		Connection connection = factory.newConnection();
 		Channel channel = connection.createChannel();
 
-
 		File f = new File("./ressources/molding_machine_10M.nt");
 		BufferedReader br = new BufferedReader(new FileReader(f));
 		String line;
-		//declare a queue for us to send to; then we can publish a message to the queue
+		// declare a queue for us to send to; then we can publish a message to
+		// the queue
 		channel.queueDeclare(QUEUE_NAME, true, false, false, null);
 		while ((line = br.readLine()) != null) {
 			channel.basicPublish("", QUEUE_NAME, null, line.getBytes());
@@ -38,14 +35,10 @@ public class Send {
 		}
 		br.close();
 
+		// String message = "Hello world !";
 
-		
-		//String message = "Hello world !";
-		
-
-		//Lastly, we close the channel and the connection
+		// Lastly, we close the channel and the connection
 		channel.close();
 		connection.close();
 	}
 }
-
