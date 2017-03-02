@@ -24,7 +24,7 @@ public class Send {
 		Channel channel = connection.createChannel();
 		
 		//declare a queue for us to send to; then we can publish a message to the queue
-		channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+		channel.queueDeclare(QUEUE_NAME, true, false, false, null);
 	    String message = "Hello world !";
 	    channel.basicPublish("", QUEUE_NAME, null, message.getBytes());
 	    System.out.println(" [x] Sent '" + message + "'");
