@@ -75,7 +75,7 @@ public class StreamRabbitMQ {
 		final DataStream<String> stream = env
 		    .addSource(new RMQSource<String>(
 		        connectionConfig,            // config for the RabbitMQ connection
-		        "hello",                 // name of the RabbitMQ queue to consume
+		        "coucou",                 // name of the RabbitMQ queue to consume
 		        true,                        // use correlation ids; can be false if only at-least-once is required
 		        new SimpleStringSchema()))   // deserialization schema to turn messages into Java objects
 		    .setParallelism(1);  
