@@ -3,6 +3,7 @@ package ensai;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Connection;
 
+import java.io.File;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -11,7 +12,7 @@ import com.rabbitmq.client.Channel;
 
 
 public class Send {
-	private final static String QUEUE_NAME = "hello";
+	private final static String QUEUE_NAME = "coucou";
 
 	public static void main(String[] argv)
 			throws java.io.IOException, TimeoutException {
@@ -22,6 +23,8 @@ public class Send {
 		factory.setHost("localhost");
 		Connection connection = factory.newConnection();
 		Channel channel = connection.createChannel();
+		
+		File f = new File("./resources/molding_mahine_10M");
 		
 		//declare a queue for us to send to; then we can publish a message to the queue
 		channel.queueDeclare(QUEUE_NAME, true, false, false, null);
