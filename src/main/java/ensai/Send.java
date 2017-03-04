@@ -17,7 +17,7 @@ public class Send {
 
 	public static void main(String[] argv) throws java.io.IOException, TimeoutException {
 
-		int waitTime = 10;
+		int waitTime = 3;
 		int i = 1;
 		// create a connection to the server
 		ConnectionFactory factory = new ConnectionFactory();

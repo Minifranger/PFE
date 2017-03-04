@@ -67,18 +67,21 @@ public class StreamRabbitMQ {
 	public static int currentObsGroup;
 	public static Map<Integer, Integer> mapObsSensors = new HashMap<Integer, Integer>();
 	public static String currentTimestamp;
+	public static String currentMachineType;
 	public static int currentMachine;
+	
 
 	public static void main(String[] args) throws Exception {
 
-		List<Integer> listSensors = new ArrayList<Integer>();
-		listSensors.add(3);
-		listSensors.add(17);
-		listSensors.add(19);
-		listSensors.add(20);
-		listSensors.add(23);
+		// Liste des capteurs à garder
+		List<Integer> listSensorsModling = new ArrayList<Integer>();
+		listSensorsModling.add(3);
+		listSensorsModling.add(17);
+		listSensorsModling.add(19);
+		listSensorsModling.add(20);
+		listSensorsModling.add(23);
 
-
+		//Timestamp et numero de machine de l'observation en cours de lecture
 		String currentTimestamp = null;
 		int currentMachine = 0;
 
@@ -107,7 +110,7 @@ public class StreamRabbitMQ {
 		//res.print();
 
 		DataStream<Tuple4<Integer, Integer, Float, String>> st = res
-				.flatMap(new InputAnalyze(listSensors));
+				.flatMap(new InputAnalyze(listSensorsModling));
 
 		 st.print();
 
@@ -120,10 +123,7 @@ public class StreamRabbitMQ {
 	//
 
 	/**
-	 * Implements the string tokenizer that splits sentences into words as a
-	 * user-defined FlatMapFunction. The function takes a line (String) and
-	 * splits it into multiple pairs in the form of "(word,1)" (Tuple2<String,
-	 * Integer>).
+	 * LineSplitter sépare les triplets RDF en 3 String
 	 */
 	public static final class LineSplitter implements MapFunction<String, Tuple3<String, String, String>> {
 
@@ -143,6 +143,10 @@ public class StreamRabbitMQ {
 		}
 	}
 
+	
+	/**
+	 * Analyse des triplets RDF et renvoi des Tuples de la forme (Numéro de machine, Numéro du capteur, valeur de l'observation, Timestamp)
+	 */
 	public static final class InputAnalyze
 			implements FlatMapFunction<Tuple3<String, String, String>, Tuple4<Integer, Integer, Float, String>> {
 
@@ -162,11 +166,19 @@ public class StreamRabbitMQ {
 			
 			case "machine>":
 				StreamRabbitMQ.currentMachine = Integer.parseInt(value.f2.split("\\_|>")[1]);
+				System.out.println("Current machine number :  " + StreamRabbitMQ.currentMachine);
+				break;
+				
+			case "type>":
+				if (value.f0.split("\\_")[0].equals("ObservationGroup")) {
+					StreamRabbitMQ.currentMachineType = value.f2.split(">")[0];
+					System.out.println("Current machine type : " + StreamRabbitMQ.currentMachineType);
+				}
 				break;
 
 			case "observationresulttime>":
 				StreamRabbitMQ.currentObsGroup = Integer.parseInt(value.f0.split("\\_|>")[1]);
-//				System.out.println("Observation group : " + StreamRabbitMQ.currentObsGroup);
+				System.out.println("Current Observation group : " + StreamRabbitMQ.currentObsGroup);
 				break;
 
 			case "observedproperty>":
@@ -198,7 +210,7 @@ public class StreamRabbitMQ {
 
 				if (tab[0].split("\\_")[0].equals("timestamp")) {
 					StreamRabbitMQ.currentTimestamp = value.f2;
-//					System.out.println("Timestamp mis à jour");
+					System.out.println("Current timestamp : "+StreamRabbitMQ.currentTimestamp);
 				}
 
 				else if (tab[0].equals("value") && StreamRabbitMQ.mapObsSensors.containsKey(Integer.parseInt(tab[1]))) {
@@ -216,7 +228,6 @@ public class StreamRabbitMQ {
 
 				}
 				break;
-
 			}
 		}
 	}
