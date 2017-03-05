@@ -24,10 +24,13 @@ import java.util.Map;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
@@ -37,6 +40,10 @@ import org.apache.flink.streaming.connectors.rabbitmq.RMQSource;
 import org.apache.flink.streaming.connectors.rabbitmq.common.RMQConnectionConfig;
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema;
 import org.apache.flink.util.Collector;
+
+import localKmeans.Cluster;
+import localKmeans.KMeans;
+import localKmeans.Point;
 
 /**
  * This example shows an implementation of WordCount with data from a text
@@ -63,7 +70,7 @@ import org.apache.flink.util.Collector;
  * 
  * @see <a href="www.openbsd.org/cgi-bin/man.cgi?query=nc">netcat</a>
  */
-public class StreamRabbitMQ {
+public class RMQtestKmeans {
 	//
 	// Program
 	//
@@ -73,19 +80,18 @@ public class StreamRabbitMQ {
 	public static String currentTimestamp;
 	public static String currentMachineType;
 	public static int currentMachine;
-	
 
 	public static void main(String[] args) throws Exception {
 
 		// Liste des capteurs à garder
 		List<Integer> listSensorsModling = new ArrayList<Integer>();
 		listSensorsModling.add(3);
-		listSensorsModling.add(17);
-//		listSensorsModling.add(19);
-//		listSensorsModling.add(20);
-//		listSensorsModling.add(23);
+		// listSensorsModling.add(17);
+		// listSensorsModling.add(19);
+		// listSensorsModling.add(20);
+		// listSensorsModling.add(23);
 
-		//Timestamp et numero de machine de l'observation en cours de lecture
+		// Timestamp et numero de machine de l'observation en cours de lecture
 		String currentTimestamp = null;
 		int currentMachine = 0;
 
@@ -111,21 +117,28 @@ public class StreamRabbitMQ {
 
 		DataStream<Tuple3<String, String, String>> res = stream.map(new LineSplitter());
 
-		//res.print();
+		// res.print();
 
-		DataStream<Tuple4<Integer, Integer, Float, String>> st = res
-				.flatMap(new InputAnalyze(listSensorsModling));
+		DataStream<Tuple4<Integer, Integer, Float, String>> st = res.flatMap(new InputAnalyze(listSensorsModling));
 
-		 //st.print();
-		 //st.keyBy(0,1).countWindow(2, 1).sum(2).print();
-		 
-		 
-		st.keyBy(0,1).countWindow(2, 1).sum(2).print();
-		 
-		 
+		// st.print();
+		// st.keyBy(0,1).countWindow(2, 1).sum(2).print();
 
-		
-		
+		st.keyBy(0, 1).countWindow(5, 1).apply(new Kmeans()).print();
+
+		// st.map(new MapFunction<Tuple4<Integer,Integer,Float,String>,
+		// Integer>() {
+		//
+		// @Override
+		// public Integer map(Tuple4<Integer, Integer, Float, String> arg0)
+		// throws Exception {
+		// Allo test = new Allo(4);
+		//
+		// return test.getId();
+		// }
+		//
+		// }).print();
+
 		// execute program
 		env.execute("Java WordCount from SocketTextStream Example");
 	}
@@ -133,6 +146,51 @@ public class StreamRabbitMQ {
 	//
 	// User Functions
 	//
+
+	public static class Kmeans implements
+			WindowFunction<Tuple4<Integer, Integer, Float, String>, Tuple5<Integer, Integer, Float, String, Integer>, Tuple, GlobalWindow> {
+
+		@Override
+		public void apply(Tuple arg0, GlobalWindow arg1, Iterable<Tuple4<Integer, Integer, Float, String>> input,
+				Collector<Tuple5<Integer, Integer, Float, String, Integer>> output) throws Exception {
+
+			int machine=0;
+			int capteur=0;
+			
+			KMeans km = new KMeans();
+			List<Point> l = new ArrayList<Point>();
+			List<Cluster> lc = new ArrayList<Cluster>();
+			int nbCluster = 0;
+
+			for (Tuple4<Integer, Integer, Float, String> t : input) {
+				if (nbCluster < 2) {
+					machine = t.f0;
+					capteur = t.f1;
+					Cluster c = new Cluster(nbCluster);
+					c.setCentroid(new Point(t.f2));
+					lc.add(c);
+					nbCluster++;
+				}
+				l.add(new Point(t.f2, t.f3));
+				
+			}
+			km.setPoints(l);
+			km.setNUM_POINTS(l.size());
+
+			km.setClusters(lc);
+			km.setNUM_CLUSTERS(lc.size());
+
+			//km.plotClusters();
+			km.calculate();
+			
+			for (Point p : km.getPoints()){
+				//System.out.println("Point : " + p.getX() + " | Cluster : "+p.getCluster());
+				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(), p.getTimestamp(), p.getCluster()));				
+			}
+
+			
+		}
+	}
 
 	/**
 	 * LineSplitter sépare les triplets RDF en 3 String
@@ -155,15 +213,14 @@ public class StreamRabbitMQ {
 		}
 	}
 
-	
 	/**
-	 * Analyse des triplets RDF et renvoi des Tuples de la forme (Numéro de machine, Numéro du capteur, valeur de l'observation, Timestamp)
+	 * Analyse des triplets RDF et renvoi des Tuples de la forme (Numéro de
+	 * machine, Numéro du capteur, valeur de l'observation, Timestamp)
 	 */
 	public static final class InputAnalyze
 			implements FlatMapFunction<Tuple3<String, String, String>, Tuple4<Integer, Integer, Float, String>> {
 
 		List<Integer> listSensors;
-	
 
 		public InputAnalyze(List<Integer> listSensors) {
 			this.listSensors = listSensors;
@@ -175,22 +232,22 @@ public class StreamRabbitMQ {
 				Collector<Tuple4<Integer, Integer, Float, String>> out) throws Exception {
 
 			switch (value.f1) {
-			
+
 			case "machine>":
-				StreamRabbitMQ.currentMachine = Integer.parseInt(value.f2.split("\\_|>")[1]);
-				System.out.println("Current machine number :  " + StreamRabbitMQ.currentMachine);
+				RMQtestKmeans.currentMachine = Integer.parseInt(value.f2.split("\\_|>")[1]);
+				System.out.println("Current machine number :  " + RMQtestKmeans.currentMachine);
 				break;
-				
+
 			case "type>":
 				if (value.f0.split("\\_")[0].equals("ObservationGroup")) {
-					StreamRabbitMQ.currentMachineType = value.f2.split(">")[0];
-					System.out.println("Current machine type : " + StreamRabbitMQ.currentMachineType);
+					RMQtestKmeans.currentMachineType = value.f2.split(">")[0];
+					System.out.println("Current machine type : " + RMQtestKmeans.currentMachineType);
 				}
 				break;
 
 			case "observationresulttime>":
-				StreamRabbitMQ.currentObsGroup = Integer.parseInt(value.f0.split("\\_|>")[1]);
-				System.out.println("Current Observation group : " + StreamRabbitMQ.currentObsGroup);
+				RMQtestKmeans.currentObsGroup = Integer.parseInt(value.f0.split("\\_|>")[1]);
+				System.out.println("Current Observation group : " + RMQtestKmeans.currentObsGroup);
 				break;
 
 			case "observedproperty>":
@@ -203,15 +260,16 @@ public class StreamRabbitMQ {
 				int sensorNb = Integer.parseInt(value.f2.split("\\_|>")[1]);
 				int obsNb = Integer.parseInt(value.f0.split("\\_|>")[1]);
 
-//				System.out.println(listSensors.contains(sensorNb));
-//				System.out.println(listSensors);
-//				System.out.println(sensorNb);
+				// System.out.println(listSensors.contains(sensorNb));
+				// System.out.println(listSensors);
+				// System.out.println(sensorNb);
 
 				if (listSensors.contains(sensorNb)) {
-					StreamRabbitMQ.mapObsSensors.put(obsNb, sensorNb);
-//					System.out.println("Numéro d'observation enregisté");
+					RMQtestKmeans.mapObsSensors.put(obsNb, sensorNb);
+					// System.out.println("Numéro d'observation enregisté");
 				} else {
-//					System.out.println("Ce capteur ne nous interesse pas !!");
+					// System.out.println("Ce capteur ne nous interesse pas
+					// !!");
 				}
 
 				break;
@@ -221,22 +279,22 @@ public class StreamRabbitMQ {
 				String[] tab = value.f0.split("\\_|>");
 
 				if (tab[0].split("\\_")[0].equals("timestamp")) {
-					StreamRabbitMQ.currentTimestamp = value.f2;
-					System.out.println("Current timestamp : "+StreamRabbitMQ.currentTimestamp);
+					RMQtestKmeans.currentTimestamp = value.f2;
+					System.out.println("Current timestamp : " + RMQtestKmeans.currentTimestamp);
 				}
 
-				else if (tab[0].equals("value") && StreamRabbitMQ.mapObsSensors.containsKey(Integer.parseInt(tab[1]))) {
-//					System.out.println(" ================= > " + "Capteur : "
-//							+ StreamRabbitMQ.mapObsSensors.get(Integer.parseInt(tab[1])) + " | Valeur : "
-//							+ Float.parseFloat(value.f2.split("\"")[1]));
+				else if (tab[0].equals("value") && RMQtestKmeans.mapObsSensors.containsKey(Integer.parseInt(tab[1]))) {
+					// System.out.println(" ================= > " + "Capteur : "
+					// +
+					// StreamRabbitMQ.mapObsSensors.get(Integer.parseInt(tab[1]))
+					// + " | Valeur : "
+					// + Float.parseFloat(value.f2.split("\"")[1]));
 
-					out.collect(new Tuple4<Integer, Integer, Float, String>(
-							StreamRabbitMQ.currentMachine,
-							StreamRabbitMQ.mapObsSensors.get(Integer.parseInt(tab[1])) ,
-							Float.parseFloat(value.f2.split("\"")[1]) ,
-							StreamRabbitMQ.currentTimestamp));
+					out.collect(new Tuple4<Integer, Integer, Float, String>(RMQtestKmeans.currentMachine,
+							RMQtestKmeans.mapObsSensors.get(Integer.parseInt(tab[1])),
+							Float.parseFloat(value.f2.split("\"")[1]), RMQtestKmeans.currentTimestamp));
 
-					StreamRabbitMQ.mapObsSensors.remove(Integer.parseInt(tab[1]));
+					RMQtestKmeans.mapObsSensors.remove(Integer.parseInt(tab[1]));
 
 				}
 				break;
