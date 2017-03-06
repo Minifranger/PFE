@@ -111,7 +111,7 @@ public class RMQtestKmeans {
 						new SimpleStringSchema())) // deserialization schema to
 													// turn messages into Java
 													// objects
-				.setParallelism(1);
+				.setParallelism(2);
 
 		// stream.print();
 
@@ -124,7 +124,12 @@ public class RMQtestKmeans {
 		// st.print();
 		// st.keyBy(0,1).countWindow(2, 1).sum(2).print();
 
-		st.keyBy(0, 1).countWindow(5, 1).apply(new Kmeans()).print();
+		DataStream< Tuple5<Integer, Integer, Float, String, Integer>> dt = st.keyBy(0, 1).countWindow(15, 1).apply(new Kmeans());
+
+		dt.print();
+		
+		dt.filter(new FiltreAnomalie<Integer>());
+		
 
 		// st.map(new MapFunction<Tuple4<Integer,Integer,Float,String>,
 		// Integer>() {
@@ -146,6 +151,16 @@ public class RMQtestKmeans {
 	//
 	// User Functions
 	//
+	
+	public static class FiltreAnomalie implements org.apache.flink.api.common.functions.FilterFunction<Integer>{
+
+		@Override
+		public boolean filter(Integer arg0) throws Exception {
+			// TODO Auto-generated method stub
+			return false;
+		}
+		
+	}
 
 	public static class Kmeans implements
 			WindowFunction<Tuple4<Integer, Integer, Float, String>, Tuple5<Integer, Integer, Float, String, Integer>, Tuple, GlobalWindow> {
@@ -160,10 +175,12 @@ public class RMQtestKmeans {
 			KMeans km = new KMeans();
 			List<Point> l = new ArrayList<Point>();
 			List<Cluster> lc = new ArrayList<Cluster>();
+			List<Float> listCentroidCluster = new ArrayList<Float> ();
 			int nbCluster = 0;
 
 			for (Tuple4<Integer, Integer, Float, String> t : input) {
-				if (nbCluster < 2) {
+				if (nbCluster < 2 && !listCentroidCluster.contains(t.f2)) {
+					listCentroidCluster.add(t.f2);
 					machine = t.f0;
 					capteur = t.f1;
 					Cluster c = new Cluster(nbCluster);
