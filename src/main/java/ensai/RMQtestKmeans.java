@@ -84,7 +84,9 @@ public class RMQtestKmeans {
 	public static int currentMachine;
 	public static int numA = 0;
 	public static int numT = 0;
-
+	public static int ws = 10;
+	public static int maxCluster = 3;
+	
 	private final static String QUEUE_NAME2 = "voila";
 
 	public static void main(String[] args) throws Exception {
@@ -99,7 +101,7 @@ public class RMQtestKmeans {
 
 		// Liste des seuils par cateur
 		Map<Integer, Double> mapSeuils = new HashMap<Integer, Double>();
-		mapSeuils.put(3, 7000.0);
+		mapSeuils.put(3, 0.5);
 
 		// Timestamp et numero de machine de l'observation en cours de lecture
 		// String currentTimestamp = null;
@@ -131,22 +133,18 @@ public class RMQtestKmeans {
 
 		DataStream<Tuple4<Integer, Integer, Float, String>> st = res.flatMap(new InputAnalyze(listSensorsModling));
 
-		// st.print();
-		// st.keyBy(0,1).countWindow(2, 1).sum(2).print();
-		// st.keyBy(0, 1).countWindow(5, 1).apply(new Kmeans()).print();
 
-		DataStream<Tuple5<Integer, Integer, Float, String, Integer>> dt = st.keyBy(0, 1).countWindow(10, 1)
+		DataStream<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> dt = st.keyBy(0, 1).countWindow(ws, 1)
 				.apply(new Kmeans());
 		
-		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt3 = dt.keyBy(0,1).countWindow(10, 1).apply(new Markov());
+		//dt.print();
 		
-	
-
-		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt4 = dt3.filter(new Filter(mapSeuils));
+		dt.map(new Markov()).filter(new Filter(mapSeuils)).print();
 		
-		dt4.print();
-
-	//	dt2.print();
+		
+		//DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt4 = dt3.filter(new Filter(mapSeuils));
+		
+		
 
 	//	DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
 
@@ -183,11 +181,11 @@ public class RMQtestKmeans {
 	}
 
 	public static class Kmeans implements
-			WindowFunction<Tuple4<Integer, Integer, Float, String>, Tuple5<Integer, Integer, Float, String, Integer>, Tuple, GlobalWindow> {
+			WindowFunction<Tuple4<Integer, Integer, Float, String>,  ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>, Tuple, GlobalWindow> {
 
 		@Override
 		public void apply(Tuple arg0, GlobalWindow arg1, Iterable<Tuple4<Integer, Integer, Float, String>> input,
-				Collector<Tuple5<Integer, Integer, Float, String, Integer>> output) throws Exception {
+				Collector<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> output) throws Exception {
 
 			int machine = 0;
 			int capteur = 0;
@@ -196,10 +194,11 @@ public class RMQtestKmeans {
 			List<Point> l = new ArrayList<Point>();
 			List<Cluster> lc = new ArrayList<Cluster>();
 			List<Float> listCentroidCluster = new ArrayList<Float>();
+			ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> res = new ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>();
 			int nbCluster = 0;
 
 			for (Tuple4<Integer, Integer, Float, String> t : input) {
-				if (nbCluster < 5 && !listCentroidCluster.contains(t.f2)) {
+				if (nbCluster < maxCluster && !listCentroidCluster.contains(t.f2)) {
 					listCentroidCluster.add(t.f2);
 					machine = t.f0;
 					capteur = t.f1;
@@ -223,83 +222,75 @@ public class RMQtestKmeans {
 			for (Point p : km.getPoints()) {
 				// System.out.println("Point : " + p.getX() + " | Cluster :
 				// "+p.getCluster());
-				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(),
-						p.getTimestamp(), p.getCluster()));
+//				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(),
+//						p.getTimestamp(), p.getCluster()));
+				res.add(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(), p.getTimestamp(), p.getCluster()));
 			}
-
+			output.collect(res);
 		}
 	}
 
-	public static final class Markov implements
-			WindowFunction<Tuple5<Integer, Integer, Float, String, Integer>, Tuple5<Integer, Integer, Float, String, Double>, Tuple, GlobalWindow> {
+	  public static final class Markov implements MapFunction<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>,
+	    Tuple5<Integer, Integer, Float, String, Double>>{
 
-		@Override
-		public void apply(Tuple key, GlobalWindow window,
-				Iterable<Tuple5<Integer, Integer, Float, String, Integer>> input,
-				Collector<Tuple5<Integer, Integer, Float, String, Double>> out) {
-			/**
-			 * Number of transitions used for combined state transition
-			 * probability
-			 */
-			int N = 3;
-			/** Number of clusters */
-			int K = 10;
-			/** Check the size of the window */
-			int windowSize = 0;
+	        @Override
+	        public Tuple5<Integer, Integer, Float, String, Double> map(
+	                ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> input) throws Exception {
 
-			HashMap<Tuple2<Integer, Integer>, Integer> countTransitions = new HashMap<Tuple2<Integer, Integer>, Integer>();
-			double[] countFrom = new double[K];
+	            /** Number of transitions used for combined state transition probability */
+	            int N = 2;
+	            /** Number of clusters */
+	            int K = 3;
+	            /** Size of the window */
+	            int windowSize = input.size();
 
-			Iterator<Tuple5<Integer, Integer, Float, String, Integer>> tupleIter = input.iterator();
-			Tuple5<Integer, Integer, Float, String, Integer> tuple = tupleIter.next();
-			windowSize++;
+	            Tuple5<Integer, Integer, Float, String, Double> output ;
 
-			Integer stateFrom = tuple.f4;
+	            if(windowSize <= N){
+	                /** TODO : Trouver une bonne valeur par défaut pour les premiers tuples qui ne peuvent
+	                 * pas avoir de probabilité de transition. */
+	                Tuple5<Integer,Integer, Float, String, Integer> lastTuple = input.get(windowSize-1);
+	                output = new Tuple5(lastTuple.f0, lastTuple.f1, lastTuple.f2, lastTuple.f3, Double.valueOf(2));
+	            }else{
+	                HashMap<Tuple2<Integer,Integer>,Integer> countTransitions = new HashMap<Tuple2<Integer,Integer>,Integer>();
+	                double[] countFrom = new double[K];
 
-			ArrayList<Integer> lastN = new ArrayList<Integer>(N + 1);
+	                Iterator<Tuple5<Integer, Integer, Float, String, Integer>> tupleIter = input.iterator();
+	                Tuple5<Integer, Integer, Float, String, Integer> tuple = tupleIter.next();
 
-			while (tupleIter.hasNext()) {
-				countFrom[tuple.f4]++;
-				tuple = tupleIter.next();
-				windowSize++;
+	                Integer stateFrom = tuple.f4;
 
-				Tuple2<Integer, Integer> transitionKey = new Tuple2<Integer, Integer>(stateFrom, tuple.f4);
-				if (!countTransitions.containsKey(transitionKey)) {
-					countTransitions.put(transitionKey, 1);
-				} else {
-					countTransitions.put(transitionKey, countTransitions.get(transitionKey) + 1);
-				}
+	                while(tupleIter.hasNext()){
+	                    countFrom[tuple.f4]++;
+	                    tuple = tupleIter.next();
 
-				stateFrom = tuple.f4;
-			}
+	                    Tuple2<Integer, Integer> transitionKey = new Tuple2<Integer,Integer>(stateFrom, tuple.f4);
+	                    if(!countTransitions.containsKey(transitionKey)){
+	                        countTransitions.put(transitionKey, 1);
+	                    }else{
+	                        countTransitions.put(transitionKey, countTransitions.get(transitionKey)+1);
+	                    }        
 
-			if (windowSize <= N) {
-				/**
-				 * TODO : Trouver une bonne valeur par défaut pour les premiers
-				 * tuples qui ne peuvent pas avoir de probabilité de transition.
-				 */
-				out.collect(new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, Double.valueOf(2)));
-			} else {
-				Iterator<Tuple5<Integer, Integer, Float, String, Integer>> findLastN = input.iterator();
-				int trigger = 0;
-				while (trigger < windowSize - (N + 1)) {
-					findLastN.next();
-					trigger++;
-				}
-				while (findLastN.hasNext()) {
-					lastN.add(findLastN.next().f4);
-				}
+	                    stateFrom = tuple.f4;
+	                }
 
-				Double probability = Double.valueOf(1);
-				for (int position = 0; position < N; position++) {
-					Tuple2<Integer, Integer> couple = new Tuple2<Integer, Integer>(lastN.get(position),
-							lastN.get(position + 1));
-					probability = probability * countTransitions.get(couple) / countFrom[couple.f0];
-				}
-				out.collect(new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability));
-			}
-		}
-	}
+	                ArrayList<Integer> lastN = new ArrayList<Integer>(N+1);
+	                for(int j = N+1; j>0; j--){
+	                    lastN.add(input.get(windowSize-j).f4);
+	                }
+
+	                Double probability = Double.valueOf(1) ;
+	                for(int position = 0; position<N; position++){
+	                    Tuple2<Integer,Integer> couple = new Tuple2<Integer,Integer>(lastN.get(position), lastN.get(position+1));
+	                    probability = probability * countTransitions.get(couple)/countFrom[couple.f0];
+	                }
+	                output = new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability);
+	            }
+
+	            return output;
+	        }
+
+	    }
 
 	/**
 	 * LineSplitter sépare les triplets RDF en 3 String
