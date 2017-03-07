@@ -14,7 +14,7 @@ import com.rabbitmq.client.Envelope;
 
 
 public class Recv {
-	  private final static String QUEUE_NAME = "hello";
+	  private final static String QUEUE_NAME = "voila";
 
 	  public static void main(String[] argv)
 	      throws java.io.IOException,

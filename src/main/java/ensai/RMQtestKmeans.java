@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.flink.api.common.functions.FilterFunction;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -36,6 +38,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.streaming.api.windowing.windows.Window;
+import org.apache.flink.streaming.connectors.rabbitmq.RMQSink;
 import org.apache.flink.streaming.connectors.rabbitmq.RMQSource;
 import org.apache.flink.streaming.connectors.rabbitmq.common.RMQConnectionConfig;
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema;
@@ -80,6 +83,11 @@ public class RMQtestKmeans {
 	public static String currentTimestamp;
 	public static String currentMachineType;
 	public static int currentMachine;
+	public static int numA = 0;
+	public static int numT = 0;
+	
+	private final static String QUEUE_NAME2 = "voila";
+
 
 	public static void main(String[] args) throws Exception {
 
@@ -90,6 +98,10 @@ public class RMQtestKmeans {
 		// listSensorsModling.add(19);
 		// listSensorsModling.add(20);
 		// listSensorsModling.add(23);
+
+		// Liste des seuils par cateur
+		Map<Integer, Double> mapSeuils = new HashMap<Integer, Double>();
+		mapSeuils.put(3, 7000.0);
 
 		// Timestamp et numero de machine de l'observation en cours de lecture
 		String currentTimestamp = null;
@@ -111,7 +123,7 @@ public class RMQtestKmeans {
 						new SimpleStringSchema())) // deserialization schema to
 													// turn messages into Java
 													// objects
-				.setParallelism(2);
+				.setParallelism(1);
 
 		// stream.print();
 
@@ -123,27 +135,51 @@ public class RMQtestKmeans {
 
 		// st.print();
 		// st.keyBy(0,1).countWindow(2, 1).sum(2).print();
-		st.keyBy(0, 1).countWindow(5, 1).apply(new Kmeans()).print();
-		// st.map(new MapFunction<Tuple4<Integer,Integer,Float,String>,
-		// Integer>() {
-		//
-		// @Override
-		// public Integer map(Tuple4<Integer, Integer, Float, String> arg0)
-		// throws Exception {
-		// Allo test = new Allo(4);
-		//
-		// return test.getId();
-		// }
-		//
-		// }).print();
+		// st.keyBy(0, 1).countWindow(5, 1).apply(new Kmeans()).print();
+
+		DataStream<Tuple5<Integer, Integer, Float, String, Integer>> dt = st.keyBy(0, 1).countWindow(10, 1)
+				.apply(new Kmeans());
+
+		DataStream<Tuple5<Integer, Integer, Float, String, Integer>> dt2 = dt.filter(new Filter(mapSeuils));
+
+		dt2.print();
+		
+		DataStream<String>  dt3 = dt2.flatMap(new SortieTransfo());
+		
+			    
+			dt3.addSink(new RMQSink<String>(
+			    connectionConfig,            // config for the RabbitMQ connection
+			    "voila",                 // name of the RabbitMQ queue to send messages to
+			    new SimpleStringSchema())); 
 
 		// execute program
 		env.execute("Java WordCount from SocketTextStream Example");
 	}
+	
+	
+
 
 	//
 	// User Functions
 	//
+
+	public static class Filter implements FilterFunction<Tuple5<Integer, Integer, Float, String, Integer>> {
+
+		private Map<Integer, Double> mapSeuils;
+		//
+		// public Filter(Map<Integer, Double> mapSeuils) {
+		// this.mapSeuils=mapSeuils;
+		// }
+
+		public Filter(Map<Integer, Double> mapSeuils) {
+			this.mapSeuils = mapSeuils;
+		}
+
+		@Override
+		public boolean filter(Tuple5<Integer, Integer, Float, String, Integer> input) throws Exception {
+			return (input.f2 < this.mapSeuils.get(input.f1));
+		}
+	}
 
 	public static class Kmeans implements
 			WindowFunction<Tuple4<Integer, Integer, Float, String>, Tuple5<Integer, Integer, Float, String, Integer>, Tuple, GlobalWindow> {
@@ -152,17 +188,17 @@ public class RMQtestKmeans {
 		public void apply(Tuple arg0, GlobalWindow arg1, Iterable<Tuple4<Integer, Integer, Float, String>> input,
 				Collector<Tuple5<Integer, Integer, Float, String, Integer>> output) throws Exception {
 
-			int machine=0;
-			int capteur=0;
-			
+			int machine = 0;
+			int capteur = 0;
+
 			KMeans km = new KMeans();
 			List<Point> l = new ArrayList<Point>();
 			List<Cluster> lc = new ArrayList<Cluster>();
-			List<Float> listCentroidCluster = new ArrayList<Float> ();
+			List<Float> listCentroidCluster = new ArrayList<Float>();
 			int nbCluster = 0;
 
 			for (Tuple4<Integer, Integer, Float, String> t : input) {
-				if (nbCluster < 2 && !listCentroidCluster.contains(t.f2)) {
+				if (nbCluster < 5 && !listCentroidCluster.contains(t.f2)) {
 					listCentroidCluster.add(t.f2);
 					machine = t.f0;
 					capteur = t.f1;
@@ -172,7 +208,7 @@ public class RMQtestKmeans {
 					nbCluster++;
 				}
 				l.add(new Point(t.f2, t.f3));
-				
+
 			}
 			km.setPoints(l);
 			km.setNUM_POINTS(l.size());
@@ -180,15 +216,16 @@ public class RMQtestKmeans {
 			km.setClusters(lc);
 			km.setNUM_CLUSTERS(lc.size());
 
-			//km.plotClusters();
+			// km.plotClusters();
 			km.calculate();
-			
-			for (Point p : km.getPoints()){
-				//System.out.println("Point : " + p.getX() + " | Cluster : "+p.getCluster());
-				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(), p.getTimestamp(), p.getCluster()));				
+
+			for (Point p : km.getPoints()) {
+				// System.out.println("Point : " + p.getX() + " | Cluster :
+				// "+p.getCluster());
+				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(),
+						p.getTimestamp(), p.getCluster()));
 			}
 
-			
 		}
 	}
 
@@ -301,4 +338,52 @@ public class RMQtestKmeans {
 			}
 		}
 	}
+
+	public static final class SortieTransfo
+			implements FlatMapFunction<Tuple5<Integer, Integer, Float, String, Integer>, String> {
+
+		@Override
+		public void flatMap(Tuple5<Integer, Integer, Float, String, Integer> avant, Collector<String> apres)
+				throws Exception {
+			String numMachine = avant.f0.toString();
+			String numSensor = avant.f1.toString();
+			String valeur = avant.f2.toString();
+			String timestamp = avant.f3.toString();
+			String probTrans = avant.f4.toString();
+
+			numA++;
+			numT++;
+			String numAno = Integer.toString(numA);
+			String numTsp = Integer.toString(numT);
+
+			String l1 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+					+ "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#Anomaly> .";
+			String l2 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#hasProbabilityOfObservedAbnormalSequence> \""
+					+ probTrans + "\"^^<http://www.w3.org/2001/XMLSchema#float> .";
+			String l3 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#hasTimestamp> <http://project-hobbit.eu/resources/debs2017#Timestamp_"
+					+ numTsp + "> .";
+			String l4 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#inAbnormalDimension> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#"
+					+ numSensor + "> .";
+			String l5 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+					+ "> <http://www.agtinternational.com/ontologies/I4.0#machine> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#MoldingMachine_"
+					+ numMachine + ">";
+			String l6 = "<http://yourNamespace/debs2017#Timestamp_" + numTsp
+					+ "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.agtinternational.com/ontologies/IoTCore#Timestamp> .";
+			String l7 = "<http://yourNamespace/debs2017#Timestamp_" + numTsp
+					+ "> <http://www.agtinternational.com/ontologies/IoTCore#valueLiteral> \"" + timestamp
+					+ "\"^^<http://www.w3.org/2001/XMLSchema#dateTime> .";
+
+			apres.collect(l1);
+			apres.collect(l2);
+			apres.collect(l3);
+			apres.collect(l4);
+			apres.collect(l5);
+			apres.collect(l6);
+			apres.collect(l7);
+		}
+	}
+
 }
