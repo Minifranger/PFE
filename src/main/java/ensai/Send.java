@@ -8,8 +8,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.flink.streaming.api.datastream.DataStream;
-
 import com.rabbitmq.client.Channel;
 
 public class Send {
