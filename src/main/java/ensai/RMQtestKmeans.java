@@ -2,6 +2,7 @@ package ensai;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -26,18 +27,16 @@ import org.apache.flink.api.common.functions.FilterFunction;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.java.DataSet;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.tuple.Tuple5;
+import org.apache.flink.api.java.tuple.Tuple6;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
-import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.streaming.connectors.rabbitmq.RMQSink;
 import org.apache.flink.streaming.connectors.rabbitmq.RMQSource;
 import org.apache.flink.streaming.connectors.rabbitmq.common.RMQConnectionConfig;
@@ -85,9 +84,8 @@ public class RMQtestKmeans {
 	public static int currentMachine;
 	public static int numA = 0;
 	public static int numT = 0;
-	
-	private final static String QUEUE_NAME2 = "voila";
 
+	private final static String QUEUE_NAME2 = "voila";
 
 	public static void main(String[] args) throws Exception {
 
@@ -104,8 +102,8 @@ public class RMQtestKmeans {
 		mapSeuils.put(3, 7000.0);
 
 		// Timestamp et numero de machine de l'observation en cours de lecture
-		String currentTimestamp = null;
-		int currentMachine = 0;
+		// String currentTimestamp = null;
+		// int currentMachine = 0;
 
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -139,31 +137,34 @@ public class RMQtestKmeans {
 
 		DataStream<Tuple5<Integer, Integer, Float, String, Integer>> dt = st.keyBy(0, 1).countWindow(10, 1)
 				.apply(new Kmeans());
-
-		DataStream<Tuple5<Integer, Integer, Float, String, Integer>> dt2 = dt.filter(new Filter(mapSeuils));
-
-		dt2.print();
 		
-		DataStream<String>  dt3 = dt2.flatMap(new SortieTransfo());
+		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt3 = dt.keyBy(0,1).countWindow(10, 1).apply(new Markov());
 		
-			    
-			dt3.addSink(new RMQSink<String>(
-			    connectionConfig,            // config for the RabbitMQ connection
-			    "voila",                 // name of the RabbitMQ queue to send messages to
-			    new SimpleStringSchema())); 
+	
+
+		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt4 = dt3.filter(new Filter(mapSeuils));
+		
+		dt4.print();
+
+	//	dt2.print();
+
+	//	DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
+
+//		dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
+//															// RabbitMQ
+//															// connection
+//				"voila", // name of the RabbitMQ queue to send messages to
+//				new SimpleStringSchema()));
 
 		// execute program
 		env.execute("Java WordCount from SocketTextStream Example");
 	}
-	
-	
-
 
 	//
 	// User Functions
 	//
 
-	public static class Filter implements FilterFunction<Tuple5<Integer, Integer, Float, String, Integer>> {
+	public static class Filter implements FilterFunction<Tuple5<Integer, Integer, Float, String, Double>> {
 
 		private Map<Integer, Double> mapSeuils;
 		//
@@ -176,8 +177,8 @@ public class RMQtestKmeans {
 		}
 
 		@Override
-		public boolean filter(Tuple5<Integer, Integer, Float, String, Integer> input) throws Exception {
-			return (input.f2 < this.mapSeuils.get(input.f1));
+		public boolean filter(Tuple5<Integer, Integer, Float, String, Double> input) throws Exception {
+			return (input.f4 < this.mapSeuils.get(input.f1));
 		}
 	}
 
@@ -226,6 +227,77 @@ public class RMQtestKmeans {
 						p.getTimestamp(), p.getCluster()));
 			}
 
+		}
+	}
+
+	public static final class Markov implements
+			WindowFunction<Tuple5<Integer, Integer, Float, String, Integer>, Tuple5<Integer, Integer, Float, String, Double>, Tuple, GlobalWindow> {
+
+		@Override
+		public void apply(Tuple key, GlobalWindow window,
+				Iterable<Tuple5<Integer, Integer, Float, String, Integer>> input,
+				Collector<Tuple5<Integer, Integer, Float, String, Double>> out) {
+			/**
+			 * Number of transitions used for combined state transition
+			 * probability
+			 */
+			int N = 3;
+			/** Number of clusters */
+			int K = 10;
+			/** Check the size of the window */
+			int windowSize = 0;
+
+			HashMap<Tuple2<Integer, Integer>, Integer> countTransitions = new HashMap<Tuple2<Integer, Integer>, Integer>();
+			double[] countFrom = new double[K];
+
+			Iterator<Tuple5<Integer, Integer, Float, String, Integer>> tupleIter = input.iterator();
+			Tuple5<Integer, Integer, Float, String, Integer> tuple = tupleIter.next();
+			windowSize++;
+
+			Integer stateFrom = tuple.f4;
+
+			ArrayList<Integer> lastN = new ArrayList<Integer>(N + 1);
+
+			while (tupleIter.hasNext()) {
+				countFrom[tuple.f4]++;
+				tuple = tupleIter.next();
+				windowSize++;
+
+				Tuple2<Integer, Integer> transitionKey = new Tuple2<Integer, Integer>(stateFrom, tuple.f4);
+				if (!countTransitions.containsKey(transitionKey)) {
+					countTransitions.put(transitionKey, 1);
+				} else {
+					countTransitions.put(transitionKey, countTransitions.get(transitionKey) + 1);
+				}
+
+				stateFrom = tuple.f4;
+			}
+
+			if (windowSize <= N) {
+				/**
+				 * TODO : Trouver une bonne valeur par défaut pour les premiers
+				 * tuples qui ne peuvent pas avoir de probabilité de transition.
+				 */
+				out.collect(new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, Double.valueOf(2)));
+			} else {
+				Iterator<Tuple5<Integer, Integer, Float, String, Integer>> findLastN = input.iterator();
+				int trigger = 0;
+				while (trigger < windowSize - (N + 1)) {
+					findLastN.next();
+					trigger++;
+				}
+				while (findLastN.hasNext()) {
+					lastN.add(findLastN.next().f4);
+				}
+
+				Double probability = Double.valueOf(1);
+				for (int position = 0; position < N; position++) {
+					Tuple2<Integer, Integer> couple = new Tuple2<Integer, Integer>(lastN.get(position),
+							lastN.get(position + 1));
+					probability = probability * countTransitions.get(couple) / countFrom[couple.f0];
+				}
+				out.collect(new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability));
+			}
 		}
 	}
 
