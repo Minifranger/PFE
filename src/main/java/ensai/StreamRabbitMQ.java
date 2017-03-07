@@ -85,10 +85,6 @@ public class StreamRabbitMQ {
 //		listSensorsModling.add(20);
 //		listSensorsModling.add(23);
 
-		//Timestamp et numero de machine de l'observation en cours de lecture
-		String currentTimestamp = null;
-		int currentMachine = 0;
-
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
 		final RMQConnectionConfig connectionConfig = new RMQConnectionConfig.Builder().setHost("localhost")
