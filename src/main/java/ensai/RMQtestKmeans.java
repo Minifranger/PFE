@@ -93,6 +93,13 @@ public class RMQtestKmeans {
 	private final static String QUEUE_NAME2 = "voila";
 
 	public static void main(String[] args) throws Exception {
+		
+		//Pour lancer le programme : - lancer RabbitMQ
+				//							 - lancer flink
+				//							 - aller dans projet eclipse : mvn clean install -Pbuild-jar
+				//							 - ouvrir le output des jobmanager : tail -f log/flink-*-jobmanager-*.out
+				//							 - lancer la classe ensai.RMQtestKmeans sous flink : bin/flink run -c ensai.RMQtestKmeans /home/minifranger/ensai_debs/PFE/target/debs-1.0-SNAPSHOT.jar
+				// 							 - lancer la méthode classe ensai.Send sous eclipse 
 
 		// Liste des capteurs à garder
 		List<Integer> listSensorsModling = new ArrayList<Integer>();
