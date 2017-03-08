@@ -82,14 +82,21 @@ public class RMQtestKmeans {
 	public static String currentTimestamp;
 	public static String currentMachineType;
 	public static int currentMachine;
+	
+	/**Compteurs anomalies*/
 	public static int numA = 0;
 	public static int numT = 0;
 	
+	/**Taille de la fenêtre*/
 	public static int ws = 10;
 	
-	public static int maxCluster = 3;
-	public static int maxIterKmean = 100;
+	/** Number of transitions used for combined state transition probability */
+    public static int N = 2;
 	
+	/**Max iter kmean*/
+	public static int M = 100;
+
+
 	private final static String QUEUE_NAME2 = "voila";
 
 	public static void main(String[] args) throws Exception {
@@ -102,17 +109,19 @@ public class RMQtestKmeans {
 				// 							 - lancer la méthode classe ensai.Send sous eclipse 
 
 		// Liste des capteurs à garder
-		List<Integer> listSensorsModling = new ArrayList<Integer>();
-		listSensorsModling.add(3);
+		//List<Integer> listSensorsModling = new ArrayList<Integer>();
+		//listSensorsModling.add(3);
 		// listSensorsModling.add(17);
 		// listSensorsModling.add(19);
 		// listSensorsModling.add(20);
 		// listSensorsModling.add(23);
 
-		// Liste des seuils par cateur
-		Map<Integer, Double> mapSeuils = new HashMap<Integer, Double>();
-		mapSeuils.put(3, 0.5);
+		//Initialisation de la map
+		// Liste des seuils par cateur et du nombre de clusters
 
+		Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils = new HashMap<Integer, Tuple2<Integer, Double>>();
+		mapClustersSeuils.put(3, new Tuple2<Integer, Double>(2, 0.4));
+		
 		// Timestamp et numero de machine de l'observation en cours de lecture
 		// String currentTimestamp = null;
 		// int currentMachine = 0;
@@ -141,27 +150,27 @@ public class RMQtestKmeans {
 
 		// res.print();
 
-		DataStream<Tuple4<Integer, Integer, Float, String>> st = res.flatMap(new InputAnalyze(listSensorsModling));
+		DataStream<Tuple4<Integer, Integer, Float, String>> st = res.flatMap(new InputAnalyze(mapClustersSeuils));
 
 
 		DataStream<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> dt = st.keyBy(0, 1).countWindow(ws, 1)
-				.apply(new Kmeans());
+				.apply(new Kmeans(mapClustersSeuils));
 		
 		//dt.print();
 		
-		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov()).filter(new Filter(mapSeuils));
-		
+		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov(mapClustersSeuils)).filter(new Filter(mapClustersSeuils));
+//		
 		dt2.print();
-		
-		DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
-		
-		dt3.print();
-
-		dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
-															// RabbitMQ
-															// connection
-				"voila", // name of the RabbitMQ queue to send messages to
-				new SimpleStringSchema()));
+//		
+//		DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
+//		
+//		dt3.print();
+//
+//		dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
+//															// RabbitMQ
+//															// connection
+//				"voila", // name of the RabbitMQ queue to send messages to
+//				new SimpleStringSchema()));
 
 		env.execute("Java WordCount from SocketTextStream Example");
 	}
@@ -172,24 +181,26 @@ public class RMQtestKmeans {
 
 	public static class Filter implements FilterFunction<Tuple5<Integer, Integer, Float, String, Double>> {
 
-		private Map<Integer, Double> mapSeuils;
-		//
-		// public Filter(Map<Integer, Double> mapSeuils) {
-		// this.mapSeuils=mapSeuils;
-		// }
-
-		public Filter(Map<Integer, Double> mapSeuils) {
-			this.mapSeuils = mapSeuils;
+		private 	Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils;
+	
+		public Filter(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
+			this.mapClustersSeuils = mapClustersSeuils;
 		}
 
 		@Override
 		public boolean filter(Tuple5<Integer, Integer, Float, String, Double> input) throws Exception {
-			return (input.f4 < this.mapSeuils.get(input.f1));
+			return (input.f4 < this.mapClustersSeuils.get(input.f1).f1);
 		}
 	}
 
 	public static class Kmeans implements
 			WindowFunction<Tuple4<Integer, Integer, Float, String>,  ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>, Tuple, GlobalWindow> {
+
+		private Map<Integer, Tuple2<Integer, Double>>  mapClustersSeuils;
+		
+		public Kmeans(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
+			this.mapClustersSeuils = mapClustersSeuils;
+		}
 
 		@Override
 		public void apply(Tuple arg0, GlobalWindow arg1, Iterable<Tuple4<Integer, Integer, Float, String>> input,
@@ -206,7 +217,7 @@ public class RMQtestKmeans {
 			int nbCluster = 0;
 
 			for (Tuple4<Integer, Integer, Float, String> t : input) {
-				if (nbCluster < maxCluster && !listCentroidCluster.contains(t.f2)) {
+				if (nbCluster < mapClustersSeuils.get(t.f1).f0 && !listCentroidCluster.contains(t.f2)) {
 					listCentroidCluster.add(t.f2);
 					machine = t.f0;
 					capteur = t.f1;
@@ -225,7 +236,7 @@ public class RMQtestKmeans {
 			km.setNUM_CLUSTERS(lc.size());
 
 			// km.plotClusters();
-			km.calculate(maxIterKmean);
+			km.calculate(M);
 
 			for (Point p : km.getPoints()) {
 				// System.out.println("Point : " + p.getX() + " | Cluster :
@@ -240,15 +251,20 @@ public class RMQtestKmeans {
 
 	  public static final class Markov implements MapFunction<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>,
 	    Tuple5<Integer, Integer, Float, String, Double>>{
+		  
+		  private Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils;
 
-	        @Override
+	        public Markov(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
+	        	this.mapClustersSeuils = mapClustersSeuils;
+		}
+
+			@Override
 	        public Tuple5<Integer, Integer, Float, String, Double> map(
 	                ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> input) throws Exception {
 
-	            /** Number of transitions used for combined state transition probability */
-	            int N = 2;
+	            
 	            /** Number of clusters */
-	            int K = 3;
+	            int K =  this.mapClustersSeuils.get(input.get(0).f1).f0;
 	            /** Size of the window */
 	            int windowSize = input.size();
 
@@ -328,12 +344,18 @@ public class RMQtestKmeans {
 	public static final class InputAnalyze
 			implements FlatMapFunction<Tuple3<String, String, String>, Tuple4<Integer, Integer, Float, String>> {
 
-		List<Integer> listSensors;
+		private Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils;
+		
+public InputAnalyze(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
+	this.mapClustersSeuils = mapClustersSeuils;
+}
 
-		public InputAnalyze(List<Integer> listSensors) {
-			this.listSensors = listSensors;
-
-		}
+//		List<Integer> listSensors;
+//
+//		public InputAnalyze(List<Integer> listSensors) {
+//			this.listSensors = listSensors;
+//
+//		}
 
 		@Override
 		public void flatMap(Tuple3<String, String, String> value,
@@ -372,7 +394,7 @@ public class RMQtestKmeans {
 				// System.out.println(listSensors);
 				// System.out.println(sensorNb);
 
-				if (listSensors.contains(sensorNb)) {
+				if (mapClustersSeuils.containsKey(sensorNb)) {
 					RMQtestKmeans.mapObsSensors.put(obsNb, sensorNb);
 					// System.out.println("Numéro d'observation enregisté");
 				} else {
