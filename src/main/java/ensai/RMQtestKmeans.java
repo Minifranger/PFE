@@ -82,17 +82,29 @@ public class RMQtestKmeans {
 	public static String currentTimestamp;
 	public static String currentMachineType;
 	public static int currentMachine;
+	
+	/** Compteur d'anomalies en sortie */ 
 	public static int numA = 0;
 	public static int numT = 0;
 	
-	public static int ws = 10;
+	public static int winSize = 10;
 	
 	public static int maxCluster = 3;
 	public static int maxIterKmean = 100;
 	
+    /** Number of transitions used for combined state transition probability */
+	public static int N = 3;
+	
 	private final static String QUEUE_NAME2 = "voila";
 
 	public static void main(String[] args) throws Exception {
+		
+		//Pour lancer le programme : - lancer RabbitMQ
+				//							 - lancer flink
+				//							 - aller dans projet eclipse : mvn clean install -Pbuild-jar
+				//							 - ouvrir le output des jobmanager : tail -f log/flink-*-jobmanager-*.out
+				//							 - lancer la classe ensai.RMQtestKmeans sous flink : bin/flink run -c ensai.RMQtestKmeans /home/minifranger/ensai_debs/PFE/target/debs-1.0-SNAPSHOT.jar
+				// 							 - lancer la méthode classe ensai.Send sous eclipse 
 
 		// Liste des capteurs à garder
 		List<Integer> listSensorsModling = new ArrayList<Integer>();
@@ -106,9 +118,7 @@ public class RMQtestKmeans {
 		Map<Integer, Double> mapSeuils = new HashMap<Integer, Double>();
 		mapSeuils.put(3, 0.5);
 
-		// Timestamp et numero de machine de l'observation en cours de lecture
-		// String currentTimestamp = null;
-		// int currentMachine = 0;
+
 
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -137,7 +147,7 @@ public class RMQtestKmeans {
 		DataStream<Tuple4<Integer, Integer, Float, String>> st = res.flatMap(new InputAnalyze(listSensorsModling));
 
 
-		DataStream<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> dt = st.keyBy(0, 1).countWindow(ws, 1)
+		DataStream<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> dt = st.keyBy(0, 1).countWindow(winSize, 1)
 				.apply(new Kmeans());
 		
 		//dt.print();
@@ -238,8 +248,6 @@ public class RMQtestKmeans {
 	        public Tuple5<Integer, Integer, Float, String, Double> map(
 	                ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> input) throws Exception {
 
-	            /** Number of transitions used for combined state transition probability */
-	            int N = 2;
 	            /** Number of clusters */
 	            int K = 3;
 	            /** Size of the window */
