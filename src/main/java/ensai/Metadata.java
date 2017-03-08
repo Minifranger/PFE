@@ -26,7 +26,15 @@ public class Metadata {
 	static String numCapteur = "";
 	static String nbClusters = ""; 
 	static String seuil  = "";
-		
+	
+	public static HashMap<Integer, Tuple2<Integer, Float>> injectionMeta = new HashMap<Integer, Tuple2<Integer, Float>>();
+	static String numMachineCapteurI = "";
+	static String numCapteurI = "";
+	static String nbClustersI = ""; 
+	static String seuilI  = "";
+	
+	static String type = "";
+	
 	public static void main(String[] args) throws IOException {
 
 
@@ -64,7 +72,7 @@ public class Metadata {
 				//System.out.println("?");
 			}
 
-			//System.out.println(lineSplit[0] + " " + lineSplit[1] + " " + lineSplit[2]);
+			System.out.println(lineSplit[0] + " " + lineSplit[1] + " " + lineSplit[2]);
 
 
 
@@ -94,12 +102,26 @@ public class Metadata {
 					break;
 				}
 			}
-
-			if(numMachineCapteur!="" && numCapteur!="" && nbClusters!="" && seuil!=""){
+			
+			if(lineSplit[2].contains("MoldingMachine")){
+				type = "MoldingMachine";
+			} if(lineSplit[2].contains("InjectionMachine")){
+				type = "InjectionMachine";
+			}
+			
+			//remplissage de la map molding
+			if(type == "MoldingMachine" && numMachineCapteur!="" && numCapteur!="" && nbClusters!="" && seuil!=""){
 				Tuple2<Integer, Float> clustersEtseuil = new Tuple2<Integer, Float>();
 				clustersEtseuil.f0 = Integer.parseInt(nbClusters);
 				clustersEtseuil.f1 = Float.parseFloat(seuil);
 				moldingMeta.put(Integer.parseInt(numCapteur), clustersEtseuil);
+			}
+			//remplissage de la map injection
+			if(type == "InjectionMachine" && numMachineCapteurI!="" && numCapteurI!="" && nbClustersI!="" && seuilI!=""){
+				Tuple2<Integer, Float> clustersEtseuilI = new Tuple2<Integer, Float>();
+				clustersEtseuilI.f0 = Integer.parseInt(nbClustersI);
+				clustersEtseuilI.f1 = Float.parseFloat(seuilI);
+				injectionMeta.put(Integer.parseInt(numCapteurI), clustersEtseuilI);
 			}
 
 			//			System.out.println(numMachineCapteur);
