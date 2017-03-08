@@ -13,7 +13,7 @@ public class Metadata {
 
 	static String[] lineSplit = new String[3];
 	//Tuple type de la machine, numero de la machine, capteurs à considérer, nbre de clusters pour ces capteurs, seuils pour ces capteurs
-	public static Tuple5<String, Integer, List<Integer>, List<Integer>, List<Float> > metaUneMachine; 
+	public static Tuple5<String, Integer, List<Integer>, List<Integer>, List<Float> > metaUneMachine = new Tuple5<String, Integer, List<Integer>, List<Integer>, List<Float> >(); 
 
 	public static void main(String[] args) throws IOException {
 
@@ -52,7 +52,7 @@ public class Metadata {
 				//System.out.println("?");
 			}
 
-			System.out.println(lineSplit[0] + " " + lineSplit[1] + " " + lineSplit[2]);
+			//System.out.println(lineSplit[0] + " " + lineSplit[1] + " " + lineSplit[2]);
 
 			//Tri
 			String MachineModel = "";
@@ -61,36 +61,36 @@ public class Metadata {
 			
 			//le MachineModel suivi
 			case "hasModel>":
-//				MachineModel = lineSplit[2].split(">")[0];
-//				metaUneMachine.f0 = MachineModel ; 
-//				metaUneMachine.f1 = Integer.parseInt(lineSplit[0].split("_")[1].split(">")[0]);
+				MachineModel = lineSplit[2].split(">")[0];
+				metaUneMachine.f0 = MachineModel ; 
+ 				metaUneMachine.f1 = Integer.parseInt(lineSplit[0].split("_")[1].split(">")[0]);
 				break;
 				
 			//le numero de capteur
 			case "hasProperty>":
-//				if(lineSplit[0].split(">")[0] == MachineModel){
-//					numMachineCapteur = lineSplit[2].split(">")[0];
-//					metaUneMachine.f2.add(Integer.parseInt(lineSplit[2].split("_")[2].split(">")[0]));
-//				}
+				if(lineSplit[0].split(">")[0] == MachineModel){
+					numMachineCapteur = lineSplit[2].split(">")[0];
+					metaUneMachine.f2.add(Integer.parseInt(lineSplit[2].split("_")[2].split(">")[0]));
+				}
 				break;
 			
 			//le nombre de clusters
 			case "hasNumberOfClusters>":
-//				if(lineSplit[0].split(">")[0] == numMachineCapteur){
-//					metaUneMachine.f3.add(Integer.parseInt(lineSplit[2].split("\"")[2].split("\"")[0]));
-//				}
+				if(lineSplit[0].split(">")[0] == numMachineCapteur){
+					metaUneMachine.f3.add(Integer.parseInt(lineSplit[2].split("\"")[2].split("\"")[0]));
+				}
 				break;
 			
 			//le seuil
 			case "valueLiteral>":
-//				if(lineSplit[0].split(">")[0] == numMachineCapteur){
-//					metaUneMachine.f4.add(Float.parseFloat(lineSplit[2].split("\"")[2].split("\"")[0]));
-//				}
+				if(lineSplit[0].split(">")[0] == numMachineCapteur){
+					metaUneMachine.f4.add(Float.parseFloat(lineSplit[2].split("\"")[2].split("\"")[0]));
+				}
 				break;
 			
 			}
 			
-			//System.out.println(metaUneMachine.f0 + " " + metaUneMachine.f1 + " " + metaUneMachine.f2 + " " + metaUneMachine.f3 + " " + metaUneMachine.f4);
+			System.out.println(metaUneMachine.f0 + " " + metaUneMachine.f1 + " " + metaUneMachine.f2 + " " + metaUneMachine.f3 + " " + metaUneMachine.f4);
 			
 		}
 		br.close();
