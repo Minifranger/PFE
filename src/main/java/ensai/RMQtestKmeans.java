@@ -84,8 +84,11 @@ public class RMQtestKmeans {
 	public static int currentMachine;
 	public static int numA = 0;
 	public static int numT = 0;
+	
 	public static int ws = 10;
+	
 	public static int maxCluster = 3;
+	public static int maxIterKmean = 100;
 	
 	private final static String QUEUE_NAME2 = "voila";
 
@@ -139,22 +142,20 @@ public class RMQtestKmeans {
 		
 		//dt.print();
 		
-		dt.map(new Markov()).filter(new Filter(mapSeuils)).print();
+		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov()).filter(new Filter(mapSeuils));
 		
+		dt2.print();
 		
-		//DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt4 = dt3.filter(new Filter(mapSeuils));
+		DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
 		
-		
+		dt3.print();
 
-	//	DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
+		dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
+															// RabbitMQ
+															// connection
+				"voila", // name of the RabbitMQ queue to send messages to
+				new SimpleStringSchema()));
 
-//		dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
-//															// RabbitMQ
-//															// connection
-//				"voila", // name of the RabbitMQ queue to send messages to
-//				new SimpleStringSchema()));
-
-		// execute program
 		env.execute("Java WordCount from SocketTextStream Example");
 	}
 
@@ -217,7 +218,7 @@ public class RMQtestKmeans {
 			km.setNUM_CLUSTERS(lc.size());
 
 			// km.plotClusters();
-			km.calculate();
+			km.calculate(maxIterKmean);
 
 			for (Point p : km.getPoints()) {
 				// System.out.println("Point : " + p.getX() + " | Cluster :
@@ -403,10 +404,10 @@ public class RMQtestKmeans {
 	}
 
 	public static final class SortieTransfo
-			implements FlatMapFunction<Tuple5<Integer, Integer, Float, String, Integer>, String> {
+			implements FlatMapFunction<Tuple5<Integer, Integer, Float, String, Double>, String> {
 
 		@Override
-		public void flatMap(Tuple5<Integer, Integer, Float, String, Integer> avant, Collector<String> apres)
+		public void flatMap(Tuple5<Integer, Integer, Float, String, Double> avant, Collector<String> apres)
 				throws Exception {
 			String numMachine = avant.f0.toString();
 			String numSensor = avant.f1.toString();

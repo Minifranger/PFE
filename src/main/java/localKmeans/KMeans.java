@@ -88,12 +88,12 @@ public class KMeans {
     }
     
 	//The process to calculate the K Means, with iterating method.
-    public void calculate() {
+    public void calculate(int maxIter) {
         boolean finish = false;
         int iteration = 0;
         
         // Add in new data, one at a time, recalculating centroids with each new one. 
-        while(!finish) {
+        while(!finish && iteration<maxIter) {
         	//Clear cluster state
         	clearClusters();
         	
@@ -140,6 +140,8 @@ public class KMeans {
     	}
     	return centroids;
     }
+    
+    //TODO Gérer le cas d'égalité des distances
     
     private void assignCluster() {
         double max = Double.MAX_VALUE;
