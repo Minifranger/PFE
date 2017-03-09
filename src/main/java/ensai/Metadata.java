@@ -2,10 +2,16 @@ package ensai;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -13,6 +19,9 @@ import org.apache.flink.api.java.tuple.Tuple5;
 
 
 public class Metadata {
+	
+	static String cheminMeta = "/home/quentin/PFE-master/ressources/sample_metadata_1machine.nt";
+	static String chemin = "/home/quentin/PFE-master/ressources/metadata";
 
 	static String[] lineSplit = new String[3];
 	//Tuple type de la machine, numero de la machine, capteurs à considérer, nbre de clusters pour ces capteurs, seuils pour ces capteurs
@@ -35,11 +44,11 @@ public class Metadata {
 	
 	static String type = "";
 	
-	public static void main(String[] args) throws IOException {
-
+	
+	public static void readData() throws IOException {
 
 		//Lecture du fichier
-		File f = new File("./ressources/sample_metadata_1machine.nt");
+		File f = new File(cheminMeta);
 
 		BufferedReader br = new BufferedReader(new FileReader(f));
 		String line;
@@ -72,11 +81,7 @@ public class Metadata {
 				//System.out.println("?");
 			}
 
-			System.out.println(lineSplit[0] + " " + lineSplit[1] + " " + lineSplit[2]);
-
-
-
-
+		//	System.out.println(lineSplit[0] + " " + lineSplit[1] + " " + lineSplit[2]);
 
 			//Tri
 			switch (lineSplit[1]) {
@@ -133,10 +138,59 @@ public class Metadata {
 		System.out.println(moldingMeta);
 
 		br.close();
+		
+		saveMap(moldingMeta);
 
 
 	}
 
+	
+	public static void saveMap (HashMap<Integer, Tuple2<Integer, Float>> map) throws IOException{
+		
+		Properties prop = new Properties();
+		
+		File f = new File (chemin);
+		
+		if (!f.exists()){
+			f.createNewFile();
+		}
+		 FileOutputStream out = new FileOutputStream(chemin);
+		
+		 Set cles = map.keySet();
+		 Iterator<Integer> it = cles.iterator();
+		 while (it.hasNext()) {
+		 int cle = it.next();
+		 String value = map.get(cle).f0 + "|" + map.get(cle).f1;
+	
+		 prop.setProperty(Integer.toString(cle), value);
+		 }
+		 
+		 prop.store(out, "-------Metadata-------");
+		 out.close();
+	}
+	
+	public static HashMap<Integer, Tuple2<Integer, Double>> load() throws IOException{
+		 HashMap<Integer, Tuple2<Integer, Double>> res = new  HashMap<Integer, Tuple2<Integer, Double>>();
+		
+			Properties prop = new Properties();
+
+			FileInputStream in = new FileInputStream(chemin);
+			prop.load(in);
+			in.close();
+
+			for (Object c : prop.keySet()) {
+				
+				//System.out.println(prop.getProperty((String) c).split("\\|")[0]);
+				int cluster = Integer.parseInt(prop.getProperty((String) c).split("\\|")[0]);
+				Double seuil = Double.parseDouble(prop.getProperty((String) c).split("\\|")[1]);
+				
+				res.put(Integer.parseInt((String) c), new Tuple2<Integer, Double>( cluster, seuil)) ;
+			}
+			
+			
+		return res;
+		
+	}
 }
 
 

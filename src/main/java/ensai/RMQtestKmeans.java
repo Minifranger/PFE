@@ -1,5 +1,6 @@
 package ensai;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -76,6 +77,8 @@ public class RMQtestKmeans {
 	//
 	// Program
 	//
+	
+	static String chemin = "/home/quentin/PFE-master/ressources/metadata";
 
 	public static int currentObsGroup;
 	public static Map<Integer, Integer> mapObsSensors = new HashMap<Integer, Integer>();
@@ -119,8 +122,22 @@ public class RMQtestKmeans {
 		//Initialisation de la map
 		// Liste des seuils par cateur et du nombre de clusters
 
+		Metadata md = new Metadata();
+		
+		File f = new File (chemin);
+		
+		if (!f.exists()){
+			md.readData();
+		}
+		
 		Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils = new HashMap<Integer, Tuple2<Integer, Double>>();
-		mapClustersSeuils.put(3, new Tuple2<Integer, Double>(2, 0.4));
+		mapClustersSeuils = md.load();
+		//mapClustersSeuils.put(3, new Tuple2<>(13, 0.73));
+		
+		System.out.println(mapClustersSeuils);
+		
+		
+		
 		
 		// Timestamp et numero de machine de l'observation en cours de lecture
 		// String currentTimestamp = null;
@@ -158,8 +175,9 @@ public class RMQtestKmeans {
 		
 		//dt.print();
 		
-		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov(mapClustersSeuils)).filter(new Filter(mapClustersSeuils));
-//		
+//	DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov(mapClustersSeuils)).filter(new Filter(mapClustersSeuils));
+		
+		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov(mapClustersSeuils));
 		dt2.print();
 //		
 //		DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
@@ -189,6 +207,7 @@ public class RMQtestKmeans {
 
 		@Override
 		public boolean filter(Tuple5<Integer, Integer, Float, String, Double> input) throws Exception {
+		//	System.out.println("Seuils : " + this.mapClustersSeuils.get(input.f1).f1);
 			return (input.f4 < this.mapClustersSeuils.get(input.f1).f1);
 		}
 	}
@@ -394,7 +413,8 @@ public InputAnalyze(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
 				// System.out.println(listSensors);
 				// System.out.println(sensorNb);
 
-				if (mapClustersSeuils.containsKey(sensorNb)) {
+				//TODO Gérer le cas du sensor 104 
+				if (mapClustersSeuils.containsKey(sensorNb) && sensorNb != 104) {
 					RMQtestKmeans.mapObsSensors.put(obsNb, sensorNb);
 					// System.out.println("Numéro d'observation enregisté");
 				} else {
