@@ -30,14 +30,13 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.api.java.tuple.Tuple4;
-import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.api.java.tuple.Tuple6;
+import org.apache.flink.api.java.tuple.Tuple7;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
-import org.apache.flink.streaming.connectors.rabbitmq.RMQSink;
 import org.apache.flink.streaming.connectors.rabbitmq.RMQSource;
 import org.apache.flink.streaming.connectors.rabbitmq.common.RMQConnectionConfig;
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema;
@@ -84,34 +83,38 @@ public class RMQtestKmeans {
 	public static int currentMachine;
 	public static int numA = 0;
 	public static int numT = 0;
-	
-	public static int ws = 10;
-	
+
+	public static ArrayList<Long> listeLatence = new ArrayList<Long>();
+
+	public static int ws = 50;
+
 	public static int maxCluster = 3;
 	public static int maxIterKmean = 100;
-	
+
 	private final static String QUEUE_NAME2 = "voila";
 
 	public static void main(String[] args) throws Exception {
-		
+
 		//Pour lancer le programme : - lancer RabbitMQ
-				//							 - lancer flink
-				//							 - aller dans projet eclipse : mvn clean install -Pbuild-jar
-				//							 - ouvrir le output des jobmanager : tail -f log/flink-*-jobmanager-*.out
-				//							 - lancer la classe ensai.RMQtestKmeans sous flink : bin/flink run -c ensai.RMQtestKmeans /home/minifranger/ensai_debs/PFE/target/debs-1.0-SNAPSHOT.jar
-				// 							 - lancer la méthode classe ensai.Send sous eclipse 
+		//							 - lancer flink
+		//							 - aller dans projet eclipse : mvn clean install -Pbuild-jar
+		//							 - ouvrir le output des jobmanager : tail -f log/flink-*-jobmanager-*.out
+		//							 - lancer la classe ensai.RMQtestKmeans sous flink : bin/flink run -c ensai.RMQtestKmeans /home/minifranger/ensai_debs/PFE/target/debs-1.0-SNAPSHOT.jar
+		// 							 - lancer la méthode classe ensai.Send sous eclipse 
 
 		// Liste des capteurs à garder
 		List<Integer> listSensorsModling = new ArrayList<Integer>();
 		listSensorsModling.add(3);
-		// listSensorsModling.add(17);
-		// listSensorsModling.add(19);
+		listSensorsModling.add(17);
+		listSensorsModling.add(19);
 		// listSensorsModling.add(20);
 		// listSensorsModling.add(23);
 
 		// Liste des seuils par cateur
 		Map<Integer, Double> mapSeuils = new HashMap<Integer, Double>();
-		mapSeuils.put(3, 0.5);
+		mapSeuils.put(3,3.1);
+		mapSeuils.put(17,3.1);
+		mapSeuils.put(19,3.1);
 
 		// Timestamp et numero de machine de l'observation en cours de lecture
 		// String currentTimestamp = null;
@@ -124,15 +127,15 @@ public class RMQtestKmeans {
 
 		final DataStream<String> stream = env
 				.addSource(new RMQSource<String>(connectionConfig, // config for
-																	// the
-																	// RabbitMQ
-																	// connection
+						// the
+						// RabbitMQ
+						// connection
 						"coucou", // name of the RabbitMQ queue to consume
 						true, // use correlation ids; can be false if only
-								// at-least-once is required
+						// at-least-once is required
 						new SimpleStringSchema())) // deserialization schema to
-													// turn messages into Java
-													// objects
+				// turn messages into Java
+				// objects
 				.setParallelism(1);
 
 		// stream.print();
@@ -141,41 +144,63 @@ public class RMQtestKmeans {
 
 		// res.print();
 
-		DataStream<Tuple4<Integer, Integer, Float, String>> st = res.flatMap(new InputAnalyze(listSensorsModling));
+		DataStream<Tuple6<Integer, Integer, Float, String, Long, Long>> st = res.flatMap(new InputAnalyze(listSensorsModling));
 
 
-		DataStream<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> dt = st.keyBy(0, 1).countWindow(ws, 1)
+		DataStream<ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>>> dt = st.keyBy(0, 1).countWindow(ws, 1)
 				.apply(new Kmeans());
-		
+
 		//dt.print();
-		
-		DataStream<Tuple5<Integer, Integer, Float, String, Double>> dt2 = dt.map(new Markov()).filter(new Filter(mapSeuils));
-		
+
+		DataStream<Tuple7<Integer, Integer, Float, String, Double, Long, Long>> dt2 = dt.map(new Markov()).filter(new Filter(mapSeuils));
+
+		dt2.countWindowAll(3).apply(new ExecutionTime());
+
 		dt2.print();
-		
-		DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
-		
-		dt3.print();
 
-		dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
-															// RabbitMQ
-															// connection
-				"voila", // name of the RabbitMQ queue to send messages to
-				new SimpleStringSchema()));
+		//DataStream<String> dt3 = dt2.flatMap(new SortieTransfo());
 
-		env.execute("Java WordCount from SocketTextStream Example");
+		//dt3.print();
+
+		//dt3.addSink(new RMQSink<String>(connectionConfig, // config for the
+		// RabbitMQ
+		// connection
+		//		"voila", // name of the RabbitMQ queue to send messages to
+		//		new SimpleStringSchema()));
+
+		env.execute("ENSAI debs 2017 flink");
 	}
 
 	//
 	// User Functions
 	//
 
-	public static class Filter implements FilterFunction<Tuple5<Integer, Integer, Float, String, Double>> {
+	public static class ExecutionTime implements AllWindowFunction<Tuple7<Integer, Integer, Float, String, Double, Long, Long>,  ArrayList<Long>, GlobalWindow> {
+
+		@Override
+		public void apply(GlobalWindow window,
+				Iterable<Tuple7<Integer, Integer, Float, String, Double, Long, Long>> input,
+				Collector<ArrayList<Long>> out)
+						throws Exception {
+
+			long resultat = 0;
+
+			for (Tuple7<Integer, Integer, Float, String, Double, Long, Long> t : input) {
+				resultat = t.f6 - t.f5;
+			}	
+			listeLatence.add(resultat);
+
+
+			out.collect(listeLatence);
+		}
+	}
+
+	public static class Filter implements FilterFunction<Tuple7<Integer, Integer, Float, String, Double, Long, Long>> {
 
 		private Map<Integer, Double> mapSeuils;
 		//
 		// public Filter(Map<Integer, Double> mapSeuils) {
-		// this.mapSeuils=mapSeuils;
+		// this.mapSeuils=mapSeuils;c
 		// }
 
 		public Filter(Map<Integer, Double> mapSeuils) {
@@ -183,29 +208,48 @@ public class RMQtestKmeans {
 		}
 
 		@Override
-		public boolean filter(Tuple5<Integer, Integer, Float, String, Double> input) throws Exception {
+		public boolean filter(Tuple7<Integer, Integer, Float, String, Double, Long, Long> input) throws Exception {
+
+			long end = System.currentTimeMillis();
+			input.f6 = end;
+
+			long sommeLatence = 0;
+			long moyenneLatence = 0;
+
+			if (listeLatence.size()>0) {
+				for (int i = 0; i < listeLatence.size(); i++) {
+					sommeLatence = sommeLatence + listeLatence.get(i);
+				}
+				moyenneLatence = sommeLatence/listeLatence.size();
+			}
+			System.out.println(listeLatence);
+			System.out.println(moyenneLatence);
+			
 			return (input.f4 < this.mapSeuils.get(input.f1));
 		}
 	}
 
 	public static class Kmeans implements
-			WindowFunction<Tuple4<Integer, Integer, Float, String>,  ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>, Tuple, GlobalWindow> {
+	WindowFunction<Tuple6<Integer, Integer, Float, String, Long, Long>,  ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>>, Tuple, GlobalWindow> {
 
 		@Override
-		public void apply(Tuple arg0, GlobalWindow arg1, Iterable<Tuple4<Integer, Integer, Float, String>> input,
-				Collector<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>> output) throws Exception {
+		public void apply(Tuple arg0, GlobalWindow arg1, Iterable<Tuple6<Integer, Integer, Float, String, Long, Long>> input,
+				Collector<ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>>> output) throws Exception {
 
 			int machine = 0;
 			int capteur = 0;
+
+			long debut = 0;
+			long fin = 0;
 
 			KMeans km = new KMeans();
 			List<Point> l = new ArrayList<Point>();
 			List<Cluster> lc = new ArrayList<Cluster>();
 			List<Float> listCentroidCluster = new ArrayList<Float>();
-			ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> res = new ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>();
+			ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>> res = new ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>>();
 			int nbCluster = 0;
 
-			for (Tuple4<Integer, Integer, Float, String> t : input) {
+			for (Tuple6<Integer, Integer, Float, String, Long, Long> t : input) {
 				if (nbCluster < maxCluster && !listCentroidCluster.contains(t.f2)) {
 					listCentroidCluster.add(t.f2);
 					machine = t.f0;
@@ -216,6 +260,8 @@ public class RMQtestKmeans {
 					nbCluster++;
 				}
 				l.add(new Point(t.f2, t.f3));
+				debut = t.f4;
+				fin = t.f5;
 
 			}
 			km.setPoints(l);
@@ -230,75 +276,74 @@ public class RMQtestKmeans {
 			for (Point p : km.getPoints()) {
 				// System.out.println("Point : " + p.getX() + " | Cluster :
 				// "+p.getCluster());
-//				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(),
-//						p.getTimestamp(), p.getCluster()));
-				res.add(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(), p.getTimestamp(), p.getCluster()));
+				//				output.collect(new Tuple5<Integer, Integer, Float, String, Integer>(machine, capteur, (float) p.getX(),
+				//						p.getTimestamp(), p.getCluster()));
+				res.add(new Tuple7<Integer, Integer, Float, String, Integer, Long, Long>(machine, capteur, (float) p.getX(), p.getTimestamp(), p.getCluster(), debut, fin));
 			}
 			output.collect(res);
 		}
 	}
 
-	  public static final class Markov implements MapFunction<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>,
-	    Tuple5<Integer, Integer, Float, String, Double>>{
+	public static final class Markov implements MapFunction<ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>>,
+	Tuple7<Integer, Integer, Float, String, Double, Long, Long>>{
 
-	        @Override
-	        public Tuple5<Integer, Integer, Float, String, Double> map(
-	                ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> input) throws Exception {
+		@Override
+		public Tuple7<Integer, Integer, Float, String, Double, Long, Long> map(
+				ArrayList<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>> input) throws Exception {
 
-	            /** Number of transitions used for combined state transition probability */
-	            int N = 2;
-	            /** Number of clusters */
-	            int K = 3;
-	            /** Size of the window */
-	            int windowSize = input.size();
+			/** Number of transitions used for combined state transition probability */
+			int N = 2;
+			/** Number of clusters */
+			int K = 3;
+			/** Size of the window */
+			int windowSize = input.size();
 
-	            Tuple5<Integer, Integer, Float, String, Double> output ;
+			Tuple7<Integer, Integer, Float, String, Double, Long, Long> output ;
 
-	            if(windowSize <= N){
-	                /** TODO : Trouver une bonne valeur par défaut pour les premiers tuples qui ne peuvent
-	                 * pas avoir de probabilité de transition. */
-	                Tuple5<Integer,Integer, Float, String, Integer> lastTuple = input.get(windowSize-1);
-	                output = new Tuple5(lastTuple.f0, lastTuple.f1, lastTuple.f2, lastTuple.f3, Double.valueOf(2));
-	            }else{
-	                HashMap<Tuple2<Integer,Integer>,Integer> countTransitions = new HashMap<Tuple2<Integer,Integer>,Integer>();
-	                double[] countFrom = new double[K];
+			if(windowSize <= N){
+				/** TODO : Trouver une bonne valeur par défaut pour les premiers tuples qui ne peuvent
+				 * pas avoir de probabilité de transition. */
+				Tuple7<Integer,Integer, Float, String, Integer, Long, Long> lastTuple = input.get(windowSize-1);
+				output = new Tuple7(lastTuple.f0, lastTuple.f1, lastTuple.f2, lastTuple.f3, Double.valueOf(2), lastTuple.f5, lastTuple.f6);
+			}else{
+				HashMap<Tuple2<Integer,Integer>,Integer> countTransitions = new HashMap<Tuple2<Integer,Integer>,Integer>();
+				double[] countFrom = new double[K];
 
-	                Iterator<Tuple5<Integer, Integer, Float, String, Integer>> tupleIter = input.iterator();
-	                Tuple5<Integer, Integer, Float, String, Integer> tuple = tupleIter.next();
+				Iterator<Tuple7<Integer, Integer, Float, String, Integer, Long, Long>> tupleIter = input.iterator();
+				Tuple7<Integer, Integer, Float, String, Integer, Long, Long> tuple = tupleIter.next();
 
-	                Integer stateFrom = tuple.f4;
+				Integer stateFrom = tuple.f4;
 
-	                while(tupleIter.hasNext()){
-	                    countFrom[tuple.f4]++;
-	                    tuple = tupleIter.next();
+				while(tupleIter.hasNext()){
+					countFrom[tuple.f4]++;
+					tuple = tupleIter.next();
 
-	                    Tuple2<Integer, Integer> transitionKey = new Tuple2<Integer,Integer>(stateFrom, tuple.f4);
-	                    if(!countTransitions.containsKey(transitionKey)){
-	                        countTransitions.put(transitionKey, 1);
-	                    }else{
-	                        countTransitions.put(transitionKey, countTransitions.get(transitionKey)+1);
-	                    }        
+					Tuple2<Integer, Integer> transitionKey = new Tuple2<Integer,Integer>(stateFrom, tuple.f4);
+					if(!countTransitions.containsKey(transitionKey)){
+						countTransitions.put(transitionKey, 1);
+					}else{
+						countTransitions.put(transitionKey, countTransitions.get(transitionKey)+1);
+					}        
 
-	                    stateFrom = tuple.f4;
-	                }
+					stateFrom = tuple.f4;
+				}
 
-	                ArrayList<Integer> lastN = new ArrayList<Integer>(N+1);
-	                for(int j = N+1; j>0; j--){
-	                    lastN.add(input.get(windowSize-j).f4);
-	                }
+				ArrayList<Integer> lastN = new ArrayList<Integer>(N+1);
+				for(int j = N+1; j>0; j--){
+					lastN.add(input.get(windowSize-j).f4);
+				}
 
-	                Double probability = Double.valueOf(1) ;
-	                for(int position = 0; position<N; position++){
-	                    Tuple2<Integer,Integer> couple = new Tuple2<Integer,Integer>(lastN.get(position), lastN.get(position+1));
-	                    probability = probability * countTransitions.get(couple)/countFrom[couple.f0];
-	                }
-	                output = new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability);
-	            }
+				Double probability = Double.valueOf(1) ;
+				for(int position = 0; position<N; position++){
+					Tuple2<Integer,Integer> couple = new Tuple2<Integer,Integer>(lastN.get(position), lastN.get(position+1));
+					probability = probability * countTransitions.get(couple)/countFrom[couple.f0];
+				}
+				output = new Tuple7(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability, tuple.f5, (long) 0.0);
+			}
+			return output;
+		}
 
-	            return output;
-	        }
-
-	    }
+	}
 
 	/**
 	 * LineSplitter sépare les triplets RDF en 3 String
@@ -326,7 +371,7 @@ public class RMQtestKmeans {
 	 * machine, Numéro du capteur, valeur de l'observation, Timestamp)
 	 */
 	public static final class InputAnalyze
-			implements FlatMapFunction<Tuple3<String, String, String>, Tuple4<Integer, Integer, Float, String>> {
+	implements FlatMapFunction<Tuple3<String, String, String>, Tuple6<Integer, Integer, Float, String, Long, Long>> {
 
 		List<Integer> listSensors;
 
@@ -337,7 +382,8 @@ public class RMQtestKmeans {
 
 		@Override
 		public void flatMap(Tuple3<String, String, String> value,
-				Collector<Tuple4<Integer, Integer, Float, String>> out) throws Exception {
+				Collector<Tuple6<Integer, Integer, Float, String, Long, Long>> out) throws Exception {
+			long debut = System.currentTimeMillis();
 
 			switch (value.f1) {
 
@@ -398,9 +444,9 @@ public class RMQtestKmeans {
 					// + " | Valeur : "
 					// + Float.parseFloat(value.f2.split("\"")[1]));
 
-					out.collect(new Tuple4<Integer, Integer, Float, String>(RMQtestKmeans.currentMachine,
+					out.collect(new Tuple6<Integer, Integer, Float, String, Long, Long>(RMQtestKmeans.currentMachine,
 							RMQtestKmeans.mapObsSensors.get(Integer.parseInt(tab[1])),
-							Float.parseFloat(value.f2.split("\"")[1]), RMQtestKmeans.currentTimestamp));
+							Float.parseFloat(value.f2.split("\"")[1]), RMQtestKmeans.currentTimestamp, debut, (long) 0.0));
 
 					RMQtestKmeans.mapObsSensors.remove(Integer.parseInt(tab[1]));
 
@@ -411,16 +457,17 @@ public class RMQtestKmeans {
 	}
 
 	public static final class SortieTransfo
-			implements FlatMapFunction<Tuple5<Integer, Integer, Float, String, Double>, String> {
+	implements FlatMapFunction<Tuple6<Integer, Integer, Float, String, Double, String>, String> {
 
 		@Override
-		public void flatMap(Tuple5<Integer, Integer, Float, String, Double> avant, Collector<String> apres)
+		public void flatMap(Tuple6<Integer, Integer, Float, String, Double, String> avant, Collector<String> apres)
 				throws Exception {
 			String numMachine = avant.f0.toString();
 			String numSensor = avant.f1.toString();
 			String valeur = avant.f2.toString();
 			String timestamp = avant.f3.toString();
 			String probTrans = avant.f4.toString();
+			String temps = avant.f5;
 
 			numA++;
 			numT++;
