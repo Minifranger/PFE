@@ -212,7 +212,7 @@ public class RMQtestKmeans {
 
 			long end = System.currentTimeMillis();
 			input.f6 = end;
-
+			
 			long sommeLatence = 0;
 			long moyenneLatence = 0;
 
@@ -224,7 +224,7 @@ public class RMQtestKmeans {
 			}
 			System.out.println(listeLatence);
 			System.out.println(moyenneLatence);
-			
+
 			return (input.f4 < this.mapSeuils.get(input.f1));
 		}
 	}
@@ -383,7 +383,6 @@ public class RMQtestKmeans {
 		@Override
 		public void flatMap(Tuple3<String, String, String> value,
 				Collector<Tuple6<Integer, Integer, Float, String, Long, Long>> out) throws Exception {
-			long debut = System.currentTimeMillis();
 
 			switch (value.f1) {
 
@@ -443,7 +442,7 @@ public class RMQtestKmeans {
 					// StreamRabbitMQ.mapObsSensors.get(Integer.parseInt(tab[1]))
 					// + " | Valeur : "
 					// + Float.parseFloat(value.f2.split("\"")[1]));
-
+					long debut = System.currentTimeMillis();
 					out.collect(new Tuple6<Integer, Integer, Float, String, Long, Long>(RMQtestKmeans.currentMachine,
 							RMQtestKmeans.mapObsSensors.get(Integer.parseInt(tab[1])),
 							Float.parseFloat(value.f2.split("\"")[1]), RMQtestKmeans.currentTimestamp, debut, (long) 0.0));
