@@ -469,23 +469,23 @@ public InputAnalyze(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
 			String numAno = Integer.toString(numA);
 			String numTsp = Integer.toString(numT);
 
-			String l1 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+			String l1 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
 					+ "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#Anomaly> .";
-			String l2 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+			String l2 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
 					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#hasProbabilityOfObservedAbnormalSequence> \""
 					+ probTrans + "\"^^<http://www.w3.org/2001/XMLSchema#float> .";
-			String l3 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+			String l3 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
 					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#hasTimestamp> <http://project-hobbit.eu/resources/debs2017#Timestamp_"
 					+ numTsp + "> .";
-			String l4 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+			String l4 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
 					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#inAbnormalDimension> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#"
 					+ numSensor + "> .";
-			String l5 = "<http://yourNamespace/debs2017#Anomaly_" + numAno
+			String l5 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
 					+ "> <http://www.agtinternational.com/ontologies/I4.0#machine> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#MoldingMachine_"
 					+ numMachine + ">";
-			String l6 = "<http://yourNamespace/debs2017#Timestamp_" + numTsp
+			String l6 = "<http://PFEensai/outputs/debs2017#Timestamp_" + numTsp
 					+ "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.agtinternational.com/ontologies/IoTCore#Timestamp> .";
-			String l7 = "<http://yourNamespace/debs2017#Timestamp_" + numTsp
+			String l7 = "<http://PFEensai/outputs/debs2017#Timestamp_" + numTsp
 					+ "> <http://www.agtinternational.com/ontologies/IoTCore#valueLiteral> \"" + timestamp
 					+ "\"^^<http://www.w3.org/2001/XMLSchema#dateTime> .";
 
