@@ -7,6 +7,7 @@ Guide d'utilisation
 2) Télécharger Flink 1.2.0 https://flink.apache.org/downloads.html (Nous utilisons la version Scala 2.11 / Hadoop2.7.0)
 
 3) Après avoir récupéré le projet depuis le Github l'importer en tant que projet Maven dans Eclipse.
+
 Remarque: penser à modifier les variables "chemin" et "cheminMeta" dans les classes RMQtestKmeans et Metadata.
 
 4) Avant de lancer le projet :
