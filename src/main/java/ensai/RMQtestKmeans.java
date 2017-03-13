@@ -478,11 +478,11 @@ public InputAnalyze(Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils) {
 					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#hasTimestamp> <http://project-hobbit.eu/resources/debs2017#Timestamp_"
 					+ numTsp + "> .";
 			String l4 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
-					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#inAbnormalDimension> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#"
+					+ "> <http://www.agtinternational.com/ontologies/DEBSAnalyticResults#inAbnormalDimension> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#_"
 					+ numSensor + "> .";
 			String l5 = "<http://PFEensai/outputs/debs2017#Anomaly_" + numAno
 					+ "> <http://www.agtinternational.com/ontologies/I4.0#machine> <http://www.agtinternational.com/ontologies/WeidmullerMetadata#MoldingMachine_"
-					+ numMachine + ">";
+					+ numMachine + "> .";
 			String l6 = "<http://PFEensai/outputs/debs2017#Timestamp_" + numTsp
 					+ "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.agtinternational.com/ontologies/IoTCore#Timestamp> .";
 			String l7 = "<http://PFEensai/outputs/debs2017#Timestamp_" + numTsp
