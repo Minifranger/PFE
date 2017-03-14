@@ -23,7 +23,7 @@ public class Send {
 
 	public static void main(String[] argv) throws java.io.IOException, TimeoutException, InterruptedException {
 
-		int waitTime = 0;
+		int waitTime = 1;
 		int i = 1;
 		// create a connection to the server
 		ConnectionFactory factory = new ConnectionFactory();
@@ -37,7 +37,7 @@ public class Send {
 		String fileName = "./ressources/molding_machine_10M.nt";
 		try {
 			intermediaire0 = Files.readAllLines(Paths.get(fileName));
-			
+
 			//stream.forEach(System.out::println);
 			//intermediaire.add(stream.forEach(intermediaire.add(e)););
 		} catch (IOException e) {
@@ -47,29 +47,34 @@ public class Send {
 		// declare a queue for us to send to; then we can publish a message to
 		// the queue
 		channel.queueDeclare(QUEUE_NAME, true, false, false, null);
-//		try{
-//			System.out.println("Waaaaaaaaaaaaait");
-//			Thread.sleep(waitTime*1000);
-//		}catch (InterruptedException e) {}
-		
-		for(int k = 0; k < 9440; k++){
+		//		try{
+		//			System.out.println("Waaaaaaaaaaaaait");
+		//			Thread.sleep(waitTime*1000);
+		//		}catch (InterruptedException e) {}
+
+		for(int k = 0; k < intermediaire0.size(); k++){
 			intermediaire.add(intermediaire0.get(k).getBytes());
 		}
-		
+
 		int c = 0;
 		long t1 = System.currentTimeMillis();
-		for(int h = 0; h < 9440; h++){
-			c++;
-			//Thread.sleep(waitTime*1000);
-			channel.basicPublish("", QUEUE_NAME, null, intermediaire.get(h)); // t1 = 110
+		for(int h = 0; h < intermediaire.size(); h++){
+
+			if (c%9440 == 1 && c!=1){
+				try{
+					System.out.println("Waaaaaaaaaaaaait");
+					Thread.sleep(waitTime*1000);
+				}catch (InterruptedException e) {}
+			}
+			channel.basicPublish("", QUEUE_NAME, null, intermediaire.get(h)); 
 			//System.out.println(intermediaire0.size());
 			//System.out.println(" [x] Sent '" + intermediaire0.get(h) + "'");
-			if(c==9440){
-				System.out.println(System.currentTimeMillis()-t1);
-			}
+			//			if(c==9440){
+			//				System.out.println(System.currentTimeMillis()-t1);
+			c++;
 		}
-		
-		
+
+
 
 		//		BufferedReader br = new BufferedReader(new FileReader(f));
 		//		String line;
