@@ -20,8 +20,8 @@ import org.apache.flink.api.java.tuple.Tuple5;
 
 public class Metadata {
 	
-	static String cheminMeta = "/home/quentin/PFE-master/ressources/sample_metadata_1machine.nt";
-	static String chemin = "/home/quentin/PFE-master/ressources/metadata";
+	static String cheminMeta = "/home/minifranger/ensai_debs/PFE/ressources/sample_metadata_1machine.nt";
+	static String chemin = "/home/minifranger/ensai_debs/PFE/ressources/metadata";
 
 	static String[] lineSplit = new String[3];
 	//Tuple type de la machine, numero de la machine, capteurs à considérer, nbre de clusters pour ces capteurs, seuils pour ces capteurs
