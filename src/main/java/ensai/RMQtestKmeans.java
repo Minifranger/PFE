@@ -56,40 +56,21 @@ import localKmeans.Cluster;
 import localKmeans.KMeans;
 import localKmeans.Point;
 
-//TODO changer ça
 /**
- * This example shows an implementation of WordCount with data from a text
- * socket. To run the example make sure that the service providing the text data
- * is already up and running.
+ * This class represent a solution from ENSAI to the DEBS 2017 challenge.
+ * @see http://www.debs2017.org/call-for-grand-challenge-solutions/ 
+ * The github solution can be accessed at
+ * @see https://github.com/kent930/PFE
  * 
  * <p>
- * To start an example socket text stream on your local machine run netcat from
- * a command line: <code>nc -lk 9999</code>, where the parameter specifies the
- * port number.
- * 
- * 
- * <p>
- * Usage: <code>SocketTextStreamWordCount &lt;hostname&gt; &lt;port&gt;</code>
- * <br>
- * 
- * <p>
- * This example shows how to:
- * <ul>
- * <li>use StreamExecutionEnvironment.socketTextStream
- * <li>write a simple Flink program
- * <li>write and use user-defined functions
- * </ul>
- * 
- * @see <a href="www.openbsd.org/cgi-bin/man.cgi?query=nc">netcat</a>
+ * To start the main class, you need to :
+ *  									 - start Rabbot MQ : invoke-rc.d rabbitmq-server start
+ *  									 - start flink 1.2.0 (from flink directory): ./bin/start-local.sh
+ *  									 - build the solution jar (from solution projet directory) : mvn clean install -Pbuild-jar
+ *  									 - start the main class (from flink directory) : bin/flink run -c ensai.RMQtestKmeans /home/minifranger/ensai_debs/PFE/target/debs-1.0-SNAPSHOT.jar 
+ * 										 - start the flink jobmanager output (from flink directory) : tail -f log/flink-*-jobmanager-*.out
+ * 										 - start the Send.java class (from Eclipse)
  */
-
-//TODO CHanger ça
-//Pour lancer le programme : - lancer RabbitMQ
-//							 - lancer flink
-//							 - aller dans projet eclipse : mvn clean install -Pbuild-jar
-//							 - ouvrir le output des jobmanager : tail -f log/flink-*-jobmanager-*.out
-//							 - lancer la classe ensai.RMQtestKmeans sous flink : bin/flink run -c ensai.RMQtestKmeans /home/minifranger/ensai_debs/PFE/target/debs-1.0-SNAPSHOT.jar
-// 							 - lancer la méthode classe ensai.Send sous eclipse 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////// MAIN CLASS ////////////////////////////////////////////////////////////
