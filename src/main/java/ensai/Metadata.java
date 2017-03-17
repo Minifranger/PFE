@@ -20,8 +20,8 @@ import org.apache.flink.api.java.tuple.Tuple5;
 
 public class Metadata {
 	
-	static String cheminMeta = "/home/minifranger/ensai_debs/PFE/ressources/sample_metadata_1machine.nt";
-	static String chemin = "/home/minifranger/ensai_debs/PFE/ressources/metadata";
+	static String cheminMetadata = "/home/minifranger/ensai_debs/PFE/ressources/molding_machine_1.nt";
+	static String cheminConfiguration = "/home/minifranger/ensai_debs/PFE/ressources/metadata";
 
 	static String[] lineSplit = new String[3];
 	//Tuple type de la machine, numero de la machine, capteurs à considérer, nbre de clusters pour ces capteurs, seuils pour ces capteurs
@@ -48,7 +48,7 @@ public class Metadata {
 	public static void readData() throws IOException {
 
 		//Lecture du fichier
-		File f = new File(cheminMeta);
+		File f = new File(cheminMetadata);
 
 		BufferedReader br = new BufferedReader(new FileReader(f));
 		String line;
@@ -149,12 +149,12 @@ public class Metadata {
 		
 		Properties prop = new Properties();
 		
-		File f = new File (chemin);
+		File f = new File (cheminConfiguration);
 		
 		if (!f.exists()){
 			f.createNewFile();
 		}
-		 FileOutputStream out = new FileOutputStream(chemin);
+		 FileOutputStream out = new FileOutputStream(cheminConfiguration);
 		
 		 Set cles = map.keySet();
 		 Iterator<Integer> it = cles.iterator();
@@ -174,7 +174,7 @@ public class Metadata {
 		
 			Properties prop = new Properties();
 
-			FileInputStream in = new FileInputStream(chemin);
+			FileInputStream in = new FileInputStream(cheminConfiguration);
 			prop.load(in);
 			in.close();
 
