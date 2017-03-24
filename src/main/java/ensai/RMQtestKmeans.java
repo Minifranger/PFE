@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.functions.FilterFunction;
 
 /*
@@ -107,19 +108,19 @@ public class RMQtestKmeans {
 	 * La taille de la fenêtre sur laquelle appliquer l'algorithme KMean.
 	 * @see KMean
 	 */
-	public static int countWindowSize = 100;
+	public static int countWindowSize = 10;
 
 	/**
 	 * Le nombre de transitions utilisés pour le calcul d'une probabilité de transition.
 	 * @see Markov
 	 */
-	public static int N = 2;
+	public static int N = 5;
 
 	/**
 	 * Le nombre maximal d'itération de l'algorithme KMean.
 	 * @see KMean
 	 */
-	public static int maxIterationKMean = 1000;
+	public static int maxIterationKMean = 50;
 
 	//TODO Rajouter javadoc, changer nom variable et valeur de la variable
 	//private final static String QUEUE_NAME2 = "voila";
@@ -173,7 +174,11 @@ public class RMQtestKmeans {
 		 * Application de la map LineSplitter
 		 * @see LineSplitter
 		 */
-		DataStream<Tuple3<String, String, String>> streamAfterSplit = streamFromRabbitMQ.map(new LineSplitter());
+		DataStream<Tuple3<String, String, String>> streamAfterSplit = streamFromRabbitMQ.flatMap(new LineSplitter1())
+				.flatMap(new LineSplitter2())
+				.flatMap(new LineSplitter3())
+				.flatMap(new LineSplitter4())
+				.flatMap(new LineSplitter5());
 
 		/**
 		 * Application de la flatMap InputAnalyze
@@ -181,6 +186,7 @@ public class RMQtestKmeans {
 		 */
 		DataStream<Tuple4<Integer, Integer, Float, String>> streamAfterAnalyze = streamAfterSplit.flatMap(new InputAnalyze(mapSensors_ClustersSeuils));
 
+		//streamAfterAnalyze.print();
 		/**
 		 * Application du keyBy pour séparer le stream selon la valeur du couple (field0, field1) de chaque tuple du stream
 		 * Mise en place d'une window glissante de taille countWindowSize. L'apparition de chaque nouveau input trigger la fonction apply.
@@ -197,7 +203,7 @@ public class RMQtestKmeans {
 		 * Application de la map Markov
 		 * @see Markov
 		 */
-		DataStream<Tuple5<Integer, Integer, Float, String, Double>> streamAfterMarkov = streamAfterKMean.map(new Markov(mapSensors_ClustersSeuils));
+		DataStream<Tuple5<Integer, Integer, Float, String, Double>> streamAfterMarkov = streamAfterKMean.flatMap(new Markov(mapSensors_ClustersSeuils));
 
 		/**
 		 * Application du filter FilterAnomalies
@@ -245,38 +251,74 @@ public class RMQtestKmeans {
 	 * @return Tuple3<String, String, String>
 	 * 											Tuple qui contient les trois élements du RDF : sujet, prédicat, objet
 	 */
-	public static final class LineSplitter extends RichMapFunction<String, Tuple3<String, String, String>> {
-
-		private Counter counterTempsLineSplitter;
-
-		/**
-		 * Création de la métrique CounterLineSplitter utilisée pour mesurer le temps d'exécution de la fonction.
-		 */
-		@Override
-		public void open(Configuration config) {
-			this.counterTempsLineSplitter = getRuntimeContext()
-					.getMetricGroup()
-					.counter("CounterLineSplitter");
-		}
+	public static final class LineSplitter1 implements FlatMapFunction<String, String> {
 
 		@Override
-		public Tuple3<String, String, String> map(String input) throws Exception {
+		public void flatMap(String value,
+				Collector<String> out) throws Exception {
 
-			this.counterTempsLineSplitter.dec(System.currentTimeMillis());
+			// normalize and split the line
+			String[] lineOrLines = value.split("\n");
 
-			String[] rdfSplit = input.toLowerCase().split(" ");
-			rdfSplit[0] = rdfSplit[0].split("#")[1];
-			rdfSplit[1] = rdfSplit[1].split("#")[1];
-			String[] tab = rdfSplit[2].split("\\^\\^");
-			if (tab.length == 1) {
-				rdfSplit[2] = tab[0].split("#")[1];
-			} else {
-				rdfSplit[2] = tab[0];
+			for(int i = 0; i < lineOrLines.length; i++){
+				out.collect(lineOrLines[i]);
 			}
+		}
+	}
 
-			this.counterTempsLineSplitter.inc(System.currentTimeMillis());
+	public static final class LineSplitter2 implements FlatMapFunction<String, Tuple3<String, String, String>> {
 
-			return new Tuple3<String, String, String>(rdfSplit[0], rdfSplit[1], rdfSplit[2]);
+		@Override
+		public void flatMap(String value,
+				Collector<Tuple3<String, String, String>> out) throws Exception {
+
+			String[] tokens = StringUtils.split(value.toLowerCase()," ");
+			out.collect(new Tuple3<String, String, String>(tokens[0], tokens[1], tokens[2]));
+
+		}
+	}
+
+	public static final class LineSplitter3 implements FlatMapFunction<Tuple3<String, String, String>, Tuple3<String, String, String>> {
+
+		@Override
+		public void flatMap(Tuple3<String, String, String> value,
+				Collector<Tuple3<String, String, String>> out) throws Exception {
+
+			value.f0 = StringUtils.split(value.f0, "#")[1];
+
+			out.collect(new Tuple3<String, String, String>(value.f0, value.f1, value.f2));
+
+		}
+	}
+
+	public static final class LineSplitter4 implements FlatMapFunction<Tuple3<String, String, String>, Tuple3<String, String, String>> {
+
+		@Override
+		public void flatMap(Tuple3<String, String, String> value,
+				Collector<Tuple3<String, String, String>> out) throws Exception {
+
+			value.f1 = StringUtils.split(value.f1, "#")[1];
+
+			out.collect(new Tuple3<String, String, String>(value.f0, value.f1, value.f2));
+
+		}
+	}
+
+	public static final class LineSplitter5 implements FlatMapFunction<Tuple3<String, String, String>, Tuple3<String, String, String>> {
+
+		@Override
+		public void flatMap(Tuple3<String, String, String> value,
+				Collector<Tuple3<String, String, String>> out) throws Exception {
+
+			String[] tab = value.f2.split("\\^\\^");
+
+			if (tab.length == 1) {
+				value.f2 = StringUtils.split(tab[0],"#")[1];
+			} else {
+				value.f2 = tab[0];
+			}
+			out.collect(new Tuple3<String, String, String>(value.f0, value.f1, value.f2));
+
 		}
 	}
 	
@@ -296,7 +338,8 @@ public class RMQtestKmeans {
 
 		@Override
 		public boolean filter(Tuple5<Integer, Integer, Float, String, Double> input) throws Exception {
-			return (input.f4 < this.mapClustersSeuils.get(input.f1).f1);
+			//return (input.f4 < this.mapClustersSeuils.get(input.f1).f1);
+			return true;
 		}
 	}
 
@@ -377,13 +420,13 @@ public class RMQtestKmeans {
 		}
 	}
 
-	/**
-	 * @author ENSAI
-	 * Calcule les probabilités de transitions d'un cluster à un autre d'après le modèle des chaines de Markov
-	 * @return Tuple5<Integer, Integer, Float, String, Double>
-	 * 															Tuple d'interet
-	 */
-	public static final class Markov extends RichMapFunction<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>,
+	 /**
+     * @author ENSAI
+     * Calcule les probabilités de transitions d'un cluster à un autre d'après le modèle des chaines de Markov
+     * @return Tuple5<Integer, Integer, Float, String, Double>
+     *                                                             Tuple d'interet
+     */
+	public static final class Markov extends RichFlatMapFunction<ArrayList<Tuple5<Integer, Integer, Float, String, Integer>>,
 	Tuple5<Integer, Integer, Float, String, Double>>{
 
 		private Map<Integer, Tuple2<Integer, Double>> mapClustersSeuils;
@@ -392,37 +435,37 @@ public class RMQtestKmeans {
 			this.mapClustersSeuils = mapClustersSeuils;
 		}
 
-		private Counter counter;
+		        private Counter counter;
+		
+		        /**
+		         * Création de la métrique CounterMarkov utilisée pour mesurer le temps d'exécution de la fonction.
+		         */
+		        @Override
+		        public void open(Configuration config) {
+		            this.counter = getRuntimeContext()
+		                    .getMetricGroup()
+		                    .counter("CounterMarkov");
+		        }
 
-		/**
-		 * Création de la métrique CounterMarkov utilisée pour mesurer le temps d'exécution de la fonction.
-		 */
 		@Override
-		public void open(Configuration config) {
-			this.counter = getRuntimeContext()
-					.getMetricGroup()
-					.counter("CounterMarkov");
-		}
-
-		@Override
-		public Tuple5<Integer, Integer, Float, String, Double> map(
-				ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> input) throws Exception {
+		public void flatMap(ArrayList<Tuple5<Integer, Integer, Float, String, Integer>> input,
+				Collector<Tuple5<Integer, Integer, Float, String, Double>> out) throws Exception {
 
 			this.counter.dec(System.currentTimeMillis());
+
 
 			/** Number of clusters */
 			int K =  this.mapClustersSeuils.get(input.get(0).f1).f0;
 			/** Size of the window */
 			int windowSize = input.size();
-
-			Tuple5<Integer, Integer, Float, String, Double> output ;
-
-			if(windowSize <= N){
-				/** TODO : Trouver une bonne valeur par défaut pour les premiers tuples qui ne peuvent
-				 * pas avoir de probabilité de transition. */
-				Tuple5<Integer,Integer, Float, String, Integer> lastTuple = input.get(windowSize-1);
-				output = new Tuple5(lastTuple.f0, lastTuple.f1, lastTuple.f2, lastTuple.f3, Double.valueOf(2));
+			if(windowSize==1){
+				/** On sort le premier tuple avec comme proba : 1. */
+				out.collect(new Tuple5(input.get(0).f0, input.get(0).f1, input.get(0).f2, input.get(0).f3, Double.valueOf(1)));
 			}else{
+				//System.out.println(windowSize);
+				int trueN = Math.min(input.size()-1, N);
+				Tuple5<Integer, Integer, Float, String, Double> output ;
+
 				HashMap<Tuple2<Integer,Integer>,Integer> countTransitions = new HashMap<Tuple2<Integer,Integer>,Integer>();
 				double[] countFrom = new double[K];
 
@@ -445,26 +488,26 @@ public class RMQtestKmeans {
 					stateFrom = tuple.f4;
 				}
 
-				ArrayList<Integer> lastN = new ArrayList<Integer>(N+1);
-				for(int j = N+1; j>0; j--){
+				ArrayList<Integer> lastN = new ArrayList<Integer>(trueN+1);
+				for(int j = 1 ; j<trueN+2; j++){
 					lastN.add(input.get(windowSize-j).f4);
 				}
 
 				Double probability = Double.valueOf(1) ;
-				for(int position = 0; position<N; position++){
-					Tuple2<Integer,Integer> couple = new Tuple2<Integer,Integer>(lastN.get(position), lastN.get(position+1));
+				for(int position = 0; position<trueN; position++){
+					Tuple2<Integer,Integer> couple = new Tuple2<Integer,Integer>(lastN.get(position+1), lastN.get(position));
 					probability = probability * countTransitions.get(couple)/countFrom[couple.f0];
+					output = new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability);
+					out.collect(output);
 				}
-				output = new Tuple5(tuple.f0, tuple.f1, tuple.f2, tuple.f3, probability);
 			}
+
 
 			this.counter.inc(System.currentTimeMillis());
 
-			return output;
 		}
 
 	}
-
 	
 	/**
 	 * @author ENSAI
@@ -500,29 +543,40 @@ public class RMQtestKmeans {
 			this.counter.dec(System.currentTimeMillis());
 
 			switch (input.f1) {
-			
-			//TODO enlever les sysout
+
 			case "machine>":
 				RMQtestKmeans.currentMachine = Integer.parseInt(input.f2.split("\\_|>")[1]);
-				System.out.println("Current machine number :  " + RMQtestKmeans.currentMachine);
+				//System.out.println("Current machine number :  " + RMQtestKmeans.currentMachine);
 				break;
 
 			case "type>":
 				if (input.f0.split("\\_")[0].equals("ObservationGroup")) {
 					RMQtestKmeans.currentMachineType = input.f2.split(">")[0];
-					System.out.println("Current machine type : " + RMQtestKmeans.currentMachineType);
+					//System.out.println("Current machine type : " + RMQtestKmeans.currentMachineType);
 				}
 				break;
 
 			case "observationresulttime>":
 				RMQtestKmeans.currentObsGroup = Integer.parseInt(input.f0.split("\\_|>")[1]);
-				System.out.println("Current Observation group : " + RMQtestKmeans.currentObsGroup);
+				//System.out.println("Current Observation group : " + RMQtestKmeans.currentObsGroup);
 				break;
 
 			case "observedproperty>":
 
-				int sensorNb = Integer.parseInt(input.f2.split("\\_|>")[1]);
+				// System.out.println("Numéro de capteur : " +
+				// Integer.parseInt(value.f2.split("\\_|>")[1]));
+				// System.out.println("Numéro d'observation : " +
+				// Integer.parseInt(value.f0.split("\\_|>")[1]));
+				
+				input.f2 = StringUtils.split(input.f2, "_")[1];
+				int sensorNb = Integer.parseInt(input.f2.split(">")[0]);
+				//System.out.println("Current capteur : " + value.f2);
+				
 				int obsNb = Integer.parseInt(input.f0.split("\\_|>")[1]);
+
+				// System.out.println(listSensors.contains(sensorNb));
+				// System.out.println(listSensors);
+				// System.out.println(sensorNb);
 				
 				//TODO Gérer le cas du sensor 104 
 				if (mapClustersSeuils.containsKey(sensorNb) && sensorNb != 104) {
@@ -532,6 +586,7 @@ public class RMQtestKmeans {
 					// System.out.println("Ce capteur ne nous interesse pas
 					// !!");
 				}
+
 				break;
 
 			case "valueliteral>":
@@ -540,16 +595,22 @@ public class RMQtestKmeans {
 
 				if (tab[0].split("\\_")[0].equals("timestamp")) {
 					RMQtestKmeans.currentTimestamp = input.f2;
-					System.out.println("Current timestamp : " + RMQtestKmeans.currentTimestamp);
+					//System.out.println("Current timestamp : " + RMQtestKmeans.currentTimestamp);
 				}
 
 				else if (tab[0].equals("value") && RMQtestKmeans.mapObsSensors.containsKey(Integer.parseInt(tab[1]))) {
-	
+					// System.out.println(" ================= > " + "Capteur : "
+					// +
+					// StreamRabbitMQ.mapObsSensors.get(Integer.parseInt(tab[1]))
+					// + " | Valeur : "
+					// + Float.parseFloat(value.f2.split("\"")[1]));
+
 					out.collect(new Tuple4<Integer, Integer, Float, String>(RMQtestKmeans.currentMachine,
 							RMQtestKmeans.mapObsSensors.get(Integer.parseInt(tab[1])),
 							Float.parseFloat(input.f2.split("\"")[1]), RMQtestKmeans.currentTimestamp));
 
 					RMQtestKmeans.mapObsSensors.remove(Integer.parseInt(tab[1]));
+
 				}
 				break;
 			}

@@ -119,7 +119,7 @@ public class KMeans {
 //        	System.out.println("Centroid distances: " + distance);
 //        	plotClusters();
         	        	
-        	if(distance == 0) {
+        	if(distance < 0.00001) {
         		finish = true;
         	}
         }

@@ -20,7 +20,7 @@ import org.apache.flink.api.java.tuple.Tuple5;
 
 public class Metadata {
 	
-	static String cheminMetadata = "/home/minifranger/ensai_debs/PFE/ressources/molding_machine_1.nt";
+	static String cheminMetadata = "/home/minifranger/ensai_debs/PFE/ressources/molding_machine_1M.metadata.nt";
 	static String cheminConfiguration = "/home/minifranger/ensai_debs/PFE/ressources/metadata";
 
 	static String[] lineSplit = new String[3];
