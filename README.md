@@ -8,7 +8,7 @@ Guide d'utilisation
 
 3) Après avoir récupéré le projet depuis le Github l'importer en tant que projet Maven dans Eclipse.
 
-Remarque: penser à modifier les variables "chemin" et "cheminMeta" dans les classes RMQtestKmeans et Metadata.
+Remarque: penser à modifier les variables "cheminConfiguration" et "cheminMetadata" dans les classes RMQtestKmeans et Metadata.
 
 4) Avant de lancer le projet :
   => Dans le dossier du projet : mvn clean install -Pbuild-jar pour construire les .jar dans le dossier target
