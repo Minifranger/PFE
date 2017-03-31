@@ -24,4 +24,4 @@ Remarque: penser à modifier les variables "chemin" et "cheminMeta" dans les cla
 
 7) Après l'execution du programme, ne pas oublier de stoper flink depuis le dossier flink1.2.0 avec la commande : ./bin/stop-local.sh
 
-
+Remarque paramètres : les paramètres de la fenêtre (ensai.RMQtestKmeans.countWindowSize), de Markov (ensai.RMQtestKmeans.N), du nombre maximal d'ittérations du Kmeans (ensai.RMQtestKmeans.maxIterationKMean) et du degrée de convergence du Kmeans (localKmeans.Kmeans.calculate) sont à définir dans le code en lui même.
